@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html{
+            background-color: #000;
+            color: white;
+        }
+        td{
+            border:1px solid grey;
+            padding: 2px 5px;
+        }
+        #output table{
+            float:left;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="f"></h1>
+    <button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button><br/><br/>
+    index:<input type="number" id="ip_index" value=1 > <br/>
+    <button id="btn_listen_controller">listen which key press on input id</button><br/>
+    <button id="btn_map_all">btn_map_all</button><br/>
+    <hr>
+    <div id="output"></div>
+
+    <script>
+        let kbi,gm
+    </script>
+    <script type="module">
+        import {ControlWrap,GamepadMaster,ControlType} from "../dist/controlwrap.esm.js";
+
+        const output_f=document.getElementById("f");
+        const output=document.getElementById("output");
+
+        gm=GamepadMaster.getInstance()
+        kbi=ControlWrap.getInstance()
+        kbi.wrappedInit({
+            type:ControlType.GAMEPAD,
+            direction:{
+                dpad:false,
+                analog:0
+            },
+            button:['attack','jump','defend','special'],
+            optional:['double','command'],
+            ui_optional:['prevTab','nextTab','info'],
+            ui_pair:{
+                'confirm':'attack',
+                'cancel':'jump'
+            }
+        },{
+
+'attack':'x',
+'jump':'a',
+'defend':'b',
+'special':'y',
+
+//optional
+'double':'leftshoulder',
+'command':'rightshoulder',
+
+/*
+ui button no need to assign in gamepad
+//ui
+'info':'back',
+'prevTab':'leftshoulder',
+'nextTab':'rightshoulder',
+*/
+},[{
+            'up':'KeyW',
+            'down':'KeyS',
+            'left':'KeyA',
+            'right':'KeyD',
+
+            'attack':'KeyF',
+            'jump':'KeyG',
+            'defend':['KeyH','KeyB'],
+            'special':'KeyR',
+
+            'double':'ShiftLeft',
+            'info':'Tab',
+            'command':'KeyQ',
+            'prevTab':'KeyQ',
+            'nextTab':'KeyE',
+        },{
+            'up':'KeyI',
+            'down':'KeyK',
+            'left':'KeyJ',
+            'right':'KeyL',
+
+            'attack':'KeyP',
+            'jump':'BracketLeft',
+            'defend':'BracketRight',
+            'special':'Semicolon'
+        }
+],
+3
+        );
+
+        /*
+        console.log(kbi.getMappableKeys(0))
+        console.log(kbi.getMappableKeys(2))
+        console.log(kbi.getAllMapping(0))
+        console.log(kbi.getAllMapping(1))
+        */
+
+        kbi.setAllMapping(2,{
+            'up':'Numpad8',
+            'down':'Numpad2',
+            'left':'Numpad4',
+            'right':'Numpad6',
+            'attack':'Numpad5',
+            'jump':'Numpad1',
+            'defend':'Numpad3',
+            'special':'Numpad0'
+        })
+
+
+        let f=0;
+        
+        const dict2Table=(dict)=>{
+            let h=`<table>`
+                for(let key in dict){
+                    if(dict[key] && dict[key].constructor == Object){
+                        h+=`<tr>
+                            <td>${key}</td>
+                            <td>${dict2Table(dict[key])}</td>
+                            </tr>`
+                    }else{
+
+                        h+=`<tr>
+                            <td>${key}</td>
+                            <td>${JSON.stringify(dict[key])}</td>
+                            </tr>
+                            `
+                    }
+                }
+                h+=`</table>`
+            return h;
+        }
+        let lastH='';
+        const etf=()=>{
+            let h='';
+
+            const all=kbi.flushAll();
+            //console.log(all)
+            for(let index in all){
+                const indexNum=parseInt(index)
+                const input=all[indexNum]
+                const extra={}
+                if(input.source!=ControlType.system){
+                    extra['index']=indexNum;
+                    extra['name']=kbi.getName(indexNum);
+                }
+                const nameExtra=input.sourceIndex>0?' - '+(input.sourceIndex+1):''
+                if(input.source==ControlType.GAMEPAD){
+                    //extra['name']=kbi.getGamepadInfo(index)
+                }else if(input.source==ControlType.KEYBOARD){
+                    //extra['name']='keyboard '+nameExtra
+                }
+
+                //extra['mixed index']=kbi.makeInnerIndex(input.source,input.sourceIndex)
+                //extra['name']=input
+                
+                h+=dict2Table({...extra,...input})
+            }
+
+            if(lastH!=h){
+                output.innerHTML=h
+                lastH=h;
+            }
+            //output_f.innerHTML=++f
+        }
+        setInterval(etf,1000/60);
+        
+        /*
+        let listner
+        addEventListener("keydown",async(e)=>{
+
+            if(e.code==='Backquote'){
+                etf();
+            }
+            if(e.code==='Digit1'){
+                listner=kbi.listenController(['confirm']).then((listner)=>{
+                    console.log('listenController done',listner)
+                }).catch(function(error) {
+                    console.log('catch',error)
+                })
+                console.log('listner',listner)
+            }
+            if(e.code==='Digit2' && listner){
+                kbi.cancelListen()
+            }
+            if(e.code==='Digit3'){
+                listner=kbi.listenAnyKey().then((listner)=>{
+                    console.log('listenAnyKey done',listner)
+                }).catch(function(error) {
+                    console.log('catch',error)
+                })
+                console.log('listner',listner)
+            }
+        })
+            */
+   
+        document.getElementById("btn_listen_controller").addEventListener('click',()=>{
+            const index=parseInt(document.getElementById("ip_index").value)
+            console.log(index)
+            
+            kbi.listenKeyFromControllerIndex(index).then((key_name)=>{
+                console.log('key_name',key_name)
+            }).catch(function(error) {
+                console.log('catch',error)
+            })
+        })
+        
+        //kbi.allowMainPlayerUseAllController=true;
+
+        document.getElementById("btn_listen_attack").addEventListener('click',()=>{
+            kbi.listenControllerIndexFromKeys(['attack','start','cancel']).then((controller_index)=>{
+                console.log('controller_index',controller_index)
+                kbi.mainControllerIndex=controller_index;
+            }).catch(function(error) {
+                console.log('catch',error)
+            })
+        })
+   </script>
+</body>
+</html>

@@ -1,12 +1,12 @@
 import {EventEmitter} from 'eventemitter3';
-import  {AllUIButton ,ControlType,Input,mappingGroup,mappingRequirement} from './types';
+import  {latestLayoutGroup ,ControlType,Input,mappingGroup,mappingRequirement} from '../types';
 
-import {IControllerMaster} from './inputs/IControllerMaster';
-import GamepadMaster from './inputs/GamepadMaster';
-import KeyboardMaster from './inputs/KeyboardMaster';
-import GamePadExtra from './inputs/GamePadExtra';
-import { dpad } from 'gamepad_standardizer';
-import { GAMPEPAD_INDEX_OFFSET,SYSTEM_INDEX_OFFSET,UI_INDEX_OFFSET,KEYBOARD_HARDCODE_UI_BUTTON,buttonLayout } from './config';
+import {IControllerMaster} from './IControllerMaster';
+import GamepadMaster from './GamepadMaster';
+import KeyboardMaster from './KeyboardMaster';
+import GamePadExtra from './GamePadExtra';
+import { GAMPEPAD_INDEX_OFFSET,SYSTEM_INDEX_OFFSET,UI_INDEX_OFFSET,KEYBOARD_HARDCODE_UI_BUTTON,buttonLayout } from '../config';
+import { checkAnyKeypress } from './common';
 
 export default class ControlWrap extends EventEmitter implements IControllerMaster{
 
@@ -96,11 +96,11 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
         this.requirement=requirement;
     }
     
-	public setDefaultGamepadMapping(mapping:Record<string,string>):void{
-        (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).setDefaultGamepadMapping(mapping);
+	public setDefaultGamepadMapping(mapping:mappingGroup):void{
+        (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).setDefaultMapping(mapping);
     }
     
-	public setDefaultKeyboardMapping(index:number=0,mapping:Record<string,string>):void{
+	public setDefaultKeyboardMapping(index:number=0,mapping:mappingGroup):void{
         (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).setDefaultKeyboardMapping(index,mapping);
     }
     
@@ -116,15 +116,12 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
     public mainControllerIndex:number=-1;
 	public allowMainPlayerUseAllController:boolean=false;
     private _lastInputIndex:number=-1;
-    private lastButtonLayout:{
-        name:string,
-        layout:buttonLayout,
-        mapping:mappingGroup
-    }={
+    private defaultButtonLayout:latestLayoutGroup={
         name:'system',
         layout:buttonLayout.keyboard,
         mapping:KEYBOARD_HARDCODE_UI_BUTTON
     };
+    private lastButtonLayout:latestLayoutGroup=this.defaultButtonLayout;
     
     public flushAll():Record<number,Input>{
         const result:Record<number,Input>={};
@@ -140,8 +137,15 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
                     const mixedIndex=this.makeIndex(controlType,Number(index));
                     result[mixedIndex]=re[index];
                     if((re[index].source===ControlType.system || this.mainControllerIndex===mixedIndex || this.allowMainPlayerUseAllController)){
-                        if(this.checkAnyKeypress(re[index])){
-                            thisInputIndex=mixedIndex;
+                        if(checkAnyKeypress(re[index])){
+                            if(!(
+                                re[index].ui_tap.toString()==='escape' && 
+                                re[index].source===ControlType.system && 
+                                thisInputIndex!==mixedIndex && 
+                                this.lastButtonLayout.layout===buttonLayout.keyboard
+                                )){
+                                thisInputIndex=mixedIndex;
+                            }
                         }
                         re[index].ui_tap.forEach(item => ui_tap_set.add(item));
                         re[index].ui_repeat.forEach(item => ui_repeat_set.add(item));
@@ -169,58 +173,25 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
         return result;
     }
 
-    public renewSystemButtonLayout(index:number):{
-        name:string,
-        layout:buttonLayout,
-        mapping:mappingGroup
-    }{
+    public renewSystemButtonLayout(index:number):latestLayoutGroup {
         if(index===SYSTEM_INDEX_OFFSET){
-            //console.log('renewSystemButtonLayout','system',KEYBOARD_HARDCODE_UI_BUTTON)
-            return {
-                name:'system',
-                layout:buttonLayout.keyboard,
-                mapping:KEYBOARD_HARDCODE_UI_BUTTON
-            }
+            return this.defaultButtonLayout
         }
-
         const [cType,cIndex]=this.parseIndex(index);
         if(cType==ControlType.GAMEPAD){
             return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).renewSystemButtonLayout(cIndex);
+        }else if(cType==ControlType.KEYBOARD){
+            return (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).renewSystemButtonLayout(cIndex);
         }
-        return (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).renewSystemButtonLayout(cIndex);
+        return this.defaultButtonLayout
     }
 
-    private checkAnyKeypress(input:Input,ui_only:boolean=false):boolean{
-        if(input.ui_tap.length>0){
-            return true;
-        }
-        if(ui_only){
-            return false;
-        }
-        for(let key in input.button){
-            if(input.button[key].just){
-                return true;
-            }
-        }
-        for(let key in input.directionButton){
-            if(input.directionButton[key as dpad].just){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public getGamepadInfo(index:number):GamePadExtra|undefined{
+    public getGamepadExtra(index:number):GamePadExtra|undefined{
         const [cType,cIndex]=this.parseIndex(index);
         if(cType==ControlType.GAMEPAD){
-            return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).getGamepadInfo(cIndex);
+            return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).getGamepadExtra(cIndex);
         }
         return undefined;
-    }
-
-    public getName(index: number):string{
-        const [cType,cIndex]=this.parseIndex(index);
-        return ControlWrap.masterRecord[cType]!.getName(cIndex);
     }
 
     //indexing================================================================
@@ -248,12 +219,9 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
     }
 
     public parseIndex(index:number=0):[ControlType,number]{
-        //let kbCount=KeyboardMaster.getInstance().count();
-        //console.log(kbCount,gpCount)
         if(index<GAMPEPAD_INDEX_OFFSET){
             return [ControlType.KEYBOARD,index];
         }
-        //let gpCount=GamepadMaster.getInstance().count();
         return [ControlType.GAMEPAD,index-GAMPEPAD_INDEX_OFFSET];
     }
 
@@ -261,16 +229,10 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
         if(cType==ControlType.KEYBOARD){
             return index;
         }
-        //let kbCount=KeyboardMaster.getInstance().count();
         return GAMPEPAD_INDEX_OFFSET+index;
     }
 
     //listen================================================================
-
-    public listenKeyFromControllerIndex(index:number):Promise<number>{
-        const [cType,cIndex]=this.parseIndex(index);
-        return ControlWrap.masterRecord[cType]!.listenKeyFromControllerIndex(cIndex);
-    }
 
     public listenControllerIndexFromKeys(keys:string[]=[]):Promise<number>{
         return new Promise((resolve,reject)=>{
@@ -290,6 +252,11 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
                 }
             }
         })
+    }
+
+    public listenKeyFromControllerIndex(index:number):Promise<number>{
+        const [cType,cIndex]=this.parseIndex(index);
+        return ControlWrap.masterRecord[cType]!.listenKeyFromControllerIndex(cIndex);
     }
  
     public cancelListen(reason?:string):void{
@@ -322,6 +289,11 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
         ControlWrap.masterRecord[cType]!.setAllMapping(cIndex,mapping);
     }
 
+	public resetDefault(index:number):mappingGroup|undefined{
+        const [cType,cIndex]=this.parseIndex(index);
+        return ControlWrap.masterRecord[cType]!.resetDefault(cIndex);
+    }
+
 	public getMappableKeys(index: number = 0): { buttons: string[], optional: string[] } {
         const [cType,cIndex]=this.parseIndex(index);
         return ControlWrap.masterRecord[cType]!.getMappableKeys(cIndex);
@@ -330,7 +302,11 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	public checkNotRepeat(index:number,buttonName:string,keyCode:string):boolean{
         const [cType,cIndex]=this.parseIndex(index);
         return ControlWrap.masterRecord[cType]!.checkNotRepeat(cIndex,buttonName,keyCode);
-        return true;
+    }
+
+    public getName(index: number):string{
+        const [cType,cIndex]=this.parseIndex(index);
+        return ControlWrap.masterRecord[cType]!.getName(cIndex);
     }
 
     public vibration(index: number,duration:number=300,strongMagnitude:number=1,weakMagnitude:number=1):void{//Promise<GamepadHapticsResult>
@@ -344,7 +320,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 
 /*
 TODO:
-get btnDisplayName of main
+    get btnDisplayName of main
 
 setAllMapping
 	getMappableKeys

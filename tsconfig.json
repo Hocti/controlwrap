@@ -74,7 +74,7 @@
   },
   "include": [
 	  "src/**/*.ts"
-  ],
+, "_bk/mouse.ts", "_bk/TouchMaster.ts"  ],
   "exclude": [
 	  //"node_modules",
     "**/dist/**",

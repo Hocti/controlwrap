@@ -39,6 +39,13 @@ export function joinState(a:ButtonState,b:ButtonState):ButtonState{
     }
 }
 
+
+let minDoubleFrame:number=30;
+
+export function setMinDoubleFrame(frame:number){
+    minDoubleFrame=frame;
+}
+
 export class Button{
 
     private lastPress:boolean=false;
@@ -47,8 +54,6 @@ export class Button{
     private pressFrame:number=0;
 
     //mix multi frame
-    static maxMixFrame:number=40;
-    static minDoubleFrame:number=30;
     mixFrameHistory:boolean[][]=[[]];
 
     constructor(){
@@ -73,13 +78,13 @@ export class Button{
             double=this.currFrameHistory.toString().indexOf('false,true,false,true')>=0;
         }
         if(!double){
-            if(this.mixFrameHistory.length>Button.maxMixFrame){
+            if(this.mixFrameHistory.length>minDoubleFrame){
                 this.mixFrameHistory.shift();
             }
             this.mixFrameHistory.push(this.currFrameHistory)
 
             let mixString:boolean[]=[]
-            for(let i=0,t=Math.min(Button.minDoubleFrame,this.mixFrameHistory.length);i<t;i++){
+            for(let i=0,t=Math.min(minDoubleFrame,this.mixFrameHistory.length);i<t;i++){
                 if(this.mixFrameHistory[i].length>1){
                     for(let j=0;j<this.mixFrameHistory[i].length;j++){
                         if(this.mixFrameHistory[i][j]!=mixString[mixString.length-1]){

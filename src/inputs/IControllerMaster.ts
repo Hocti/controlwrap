@@ -1,5 +1,5 @@
 import {EventEmitter} from 'eventemitter3';
-import {mappingRequirement,Input,mappingGroup} from "../types";
+import {mappingRequirement,Input,mappingGroup,latestLayoutGroup} from "../types";
 import { buttonLayout } from '../config';
 
 //<ControllerInstance,InputType,MappingType>
@@ -20,6 +20,7 @@ export interface IControllerMaster extends EventEmitter{
     //mapping
     importRequirement(requirement: mappingRequirement): void;
     setAllMapping(index: number, mapping: mappingGroup): void;
+    resetDefault(index: number): mappingGroup|undefined;
     getAllMapping(index: number): mappingGroup;
     setMapping(index: number, buttonName: string, keyCode: string): boolean;
     checkMapping(index: number, buttonName: string, keyCode: string): boolean;
@@ -29,11 +30,7 @@ export interface IControllerMaster extends EventEmitter{
         optional: string[];
     };
     
-    renewSystemButtonLayout(index:number):{
-        name:string,
-        layout:buttonLayout,
-        mapping:mappingGroup
-    }
+    renewSystemButtonLayout(index:number):latestLayoutGroup
     //setDefaultMapping(index: number, mapping: mappingGroup): void;
 
     vibration(index: number,duration:number,strongMagnitude:number,weakMagnitude:number): void;//:Promise<GamepadHapticsResult>;

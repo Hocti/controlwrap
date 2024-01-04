@@ -1,14 +1,14 @@
 //import "keyboard_mouse"
 //import "gamepad"
 
-import ControlWrap from "./ControlWrap";
+import ControlWrap from "./inputs/ControlWrap";
 
 //import {IControllerMaster} from "./inputs/IControllerMaster";
 
 import GamepadMaster from "./inputs/GamepadMaster";
 import KeyboardMaster from "./inputs/KeyboardMaster";
 
-import PlayerIndexMapper from "./PlayerIndexMapper";
+import PlayerIndexMapper from "./useful/PlayerIndexMapper";
 
 export {
     //IControllerMaster,
@@ -29,6 +29,10 @@ export {
     type ControllerProfile,
 } from "./types";
 
+export {
+    buttonLayout
+} from "./config";
 
+export {getUITap,getUIsTap,joinState,setMinDoubleFrame} from "./inputs/Button";
 
-export {getUITap,getUIsTap,joinState} from "./inputs/Button";
+export * as gamepad_standardizer from "gamepad_standardizer"

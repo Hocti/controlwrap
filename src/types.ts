@@ -1,5 +1,6 @@
 
 import { dpadPress,directionWrap,xy,dpad } from "gamepad_standardizer";
+import { GAMPEPAD_INDEX_OFFSET,SYSTEM_INDEX_OFFSET,UI_INDEX_OFFSET,KEYBOARD_HARDCODE_UI_BUTTON,buttonLayout } from './config';
 
 export const UIButton ={
     ...dpad,
@@ -80,7 +81,11 @@ export type mappingRequirement = {
 export type mappingGroup=Record<string,string|string[]>
 
 
-
+export type latestLayoutGroup = {
+    name:string,
+    layout:buttonLayout,
+    mapping:mappingGroup
+}
 
 export type ControllerInfo = {
     wrappedIndex:number,//0 mixed keyboard+gamepad

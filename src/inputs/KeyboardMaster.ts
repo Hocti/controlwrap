@@ -2,7 +2,7 @@ import {EventEmitter} from 'eventemitter3';
 
 
 import { dpad,dpadPress, getDpadDirection,xy } from "gamepad_standardizer";
-import  {ButtonState ,mappingGroup,Input,ControlType,mappingRequirement} from '../types';
+import  {ButtonState ,mappingGroup,Input,ControlType,mappingRequirement,latestLayoutGroup} from '../types';
 import  {inEnum,findKeyByValue,stopEvent,clone} from '../utils/utils';
 import { Button,getUITap,joinState,isRepeat } from './Button';
 import InputDeviceMaster,{ listenStatus } from './InputDeviceMaster';
@@ -379,6 +379,19 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
     private defaultMapping:Record<number,mappingGroup>={};
 
+    
+
+	public resetDefault(index:number):mappingGroup|undefined{
+        if(this.defaultMapping[index]){
+            this.currentMapping[index]=clone(this.defaultMapping[index]);
+        }
+        return this.defaultMapping[index];
+    }
+
+    public setDefaultMapping(mapping:mappingGroup):void{
+        this.setDefaultKeyboardMapping(0,mapping);
+    }
+
     public setDefaultKeyboardMapping(id:number,mapping:mappingGroup):void{
         /*
         for(let buttonName in mapping){
@@ -404,7 +417,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
             return false;
         }
         
-        return true;0
+        return true;
     }
 
 	public checkNotRepeat(id:number,buttonName:string,keyCode:string):boolean{
@@ -427,11 +440,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
     //=======================
 
-    public renewSystemButtonLayout(index:number):{
-        name:string,
-        layout:buttonLayout,
-        mapping:mappingGroup
-    }{
+    public renewSystemButtonLayout(index:number):latestLayoutGroup{
         return {
             name:this.getName(index),
             layout:buttonLayout.keyboard,
@@ -479,7 +488,6 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
                 this.emit('add',i);
             }
         }
-        //if()return;
         for(let i=0;i<num;i++){
             if(!this.currentMapping[i]){
                 this.currentMapping[i]={}
@@ -505,11 +513,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
                     })
                 }
                 //
-                if(this.defaultMapping[i]){
-                    for(let keyName in this.defaultMapping[i]){
-                        this.currentMapping[i][keyName]=this.defaultMapping[i][keyName];
-                    }
-                }
+                this.resetDefault(i);
                 //console.log('setPlayerCountFromKeyboard',i,this.currentMapping[i],this.defaultMapping[i])
             }
         }

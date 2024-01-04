@@ -2,7 +2,7 @@ import {EventEmitter} from 'eventemitter3';
 
 //import * as gamepad_standardizer from "gamepad_standardizer"
 import { dpad,DP_BUTTON_NAME, getDpadDirection,xy } from "gamepad_standardizer";
-import  {ButtonState ,mappingGroup,Input,AllUIButton,mappingRequirement,ControlType} from '../types';
+import  {ButtonState ,mappingGroup,Input,AllUIButton,mappingRequirement,ControlType,latestLayoutGroup} from '../types';
 import  {clone,findKeyByValue, inEnum} from '../utils/utils';
 import { Button,isRepeat,getUITap, joinState } from './Button';
 import InputDeviceMaster,{ listenStatus } from './InputDeviceMaster';
@@ -12,6 +12,29 @@ import KeyboardMaster from './KeyboardMaster';
 import { buttonLayout } from '../config';
 
 const unchangeable=['start',...DP_BUTTON_NAME];
+
+enum Operation {
+    Plus = '+',
+    Minus = '-'
+}
+
+type RawEvent =
+    {
+        index: number;
+        type: 'axes';
+        axes_index: number;
+        Operation: Operation;
+    } | {
+        index: number;
+        type: 'hat';
+        axes_index: number;
+        HNum:number,
+    } | {
+        index: number;
+        type: 'button';
+        button_index: number;
+    };
+
 
 export default class GamepadMaster extends InputDeviceMaster implements IControllerMaster{
 
@@ -71,7 +94,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
         KeyboardMaster.getInstance().addListener("escape", this.systemEscape.bind(this));
     }
 
-    public getGamepadInfo(index:number):GamePadExtra|undefined{
+    public getGamepadExtra(index:number):GamePadExtra|undefined{
         if(this.gamePads[index]){
             return this.gamePads[index];
         }
@@ -93,9 +116,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 
     private addGP(event:GamepadEvent) {
         this.gamePads[event.gamepad.index]=new GamePadExtra(event.gamepad);
-        if(this.defaultStandardMapping){
-            this.currentMapping[event.gamepad.index]=this.defaultStandardMapping;
-        }
+        this.resetDefault(event.gamepad.index);
         if(performance.now()>5000){
             this.gamePads[event.gamepad.index]!.vibration(100,1,1);
         }
@@ -164,11 +185,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
         return '';
     }
 
-    public renewSystemButtonLayout(index:number):{
-        name:string,
-        layout:buttonLayout,
-        mapping:mappingGroup
-    }{
+    public renewSystemButtonLayout(index:number):latestLayoutGroup{
         const mapping:mappingGroup={...this.currentMapping[index]}
 
         for(let uikeyName in AllUIButton){
@@ -296,101 +313,107 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 
  
     private listenRawGamepad:{axes:number[],buttons:GamepadButton[]}|undefined;
+    private listenRawType:{axes:boolean,button:boolean}={axes:false,button:false}
 
-    public listenRaw(index:number=0):Promise<number>{
-        if(!this.gamePads[index] || !this.gamePads[index]!.lastGamepad.connected){
-            return Promise.reject(`no gamepad at ${index}`);
-        }
-
-        this.listenMode=listenStatus.raw;
-        this.listeningIndex=index;
+    
+    public saveAllRelaseGPState(index:number):void{
         this.listenRawGamepad={
             axes:[...this.gamePads[index]!.lastGamepad.axes],
             buttons:[...this.gamePads[index]!.lastGamepad.buttons]
         }
+    }
+    
+    //* BUG: long press esc,then skip all?? should be only active on just down
+    public listenRaw(index:number=0,button:boolean=true,axes:boolean=false):Promise<RawEvent>{
+        if(!this.gamePads[index] || !this.gamePads[index]!.lastGamepad.connected){
+            return Promise.reject(`no gamepad at ${index}`);
+        }
+        if(!button && !axes){
+            return Promise.reject(`all false`);
+        }
+        if(!button && axes && this.gamePads[index]!.lastGamepad.axes.length===0){
+            return Promise.reject(`not axes`);
+        }
+        if(button && this.gamePads[index]!.lastGamepad.buttons.length<2){
+            return Promise.reject(`at least 2 buttons`);
+        }
+        //* BUG: on firefox, long press start then trigger cancelListen
+        /*
+        for(let i=0;i<this.gamePads[index]!.lastGamepad.buttons.length;i++){
+            if(this.gamePads[index]!.lastGamepad.buttons[i].pressed){
+                return Promise.reject(`no button should be pressing : button ${i} is pressed`);
+            }
+        }
+        */
+        this.listenRawType={axes,button};
+
+        this.listenMode=listenStatus.raw;
+        this.listeningIndex=index;
+        //save old?
         this.removeAllListeners('cancelListen');
         this.removeAllListeners('listenRaw');
 
         return new Promise((resolve,reject)=>{
-            this.addListener('cancelListen',()=>{
+            this.addListener('cancelListen',(reason:string|undefined)=>{
                 this.listenMode=listenStatus.none;
                 this.removeAllListeners('cancelListen');
                 this.removeAllListeners('listenRaw');
-                reject();
+                reject(reason);
             });
-            /*
-            this.addListener('listenRaw',(i)=>{
+            this.addListener('listenRaw',(obj:RawEvent)=>{
                 this.listenMode=listenStatus.none;
                 this.removeAllListeners('cancelListen');
                 this.removeAllListeners('listenRaw');
-                resolve(i);
+                resolve(obj);
             });
-            */
         });
     }
 
     private processRaw(rawGamepad:Gamepad){
-        //*
-        rawGamepad.axes.forEach((axes_value,axes_index)=>{
-            const old_value=this.listenRawGamepad!.axes[axes_index];
+        if(this.listenRawType.axes){
+            rawGamepad.axes.forEach((axes_value,axes_index)=>{
+                const old_value=this.listenRawGamepad!.axes[axes_index];
 
-            const HNum=Math.round(axes_value*7);
-            const OHNum=Math.round(old_value*7);
-            if( (OHNum==9 || (OHNum==0 && HNum!=0)) && 
-                // (!(axes_value==0 || axes_value==1 || axes_value==-1) || !(old_value==0 || old_value==1 || old_value==-1)) &&
-                (Math.abs(axes_value*7-HNum)<0.000001) && (Math.abs(old_value*7-OHNum)<0.000001)
-            ){
-                if(HNum!=9 && HNum!=OHNum){
-                    this.emit('raw',{
-                        index:this.listeningIndex,
-                        type:'axes_dpad',
-                        axes_index,
-                        HNum
-                    });
+                const HNum=Math.round(axes_value*7);
+                const OHNum=Math.round(old_value*7);
+                if( (OHNum==9 || (OHNum==0 && HNum!=0)) && 
+                    // (!(axes_value==0 || axes_value==1 || axes_value==-1) || !(old_value==0 || old_value==1 || old_value==-1)) &&
+                    (Math.abs(axes_value*7-HNum)<0.000001) && (Math.abs(old_value*7-OHNum)<0.000001)
+                ){
+                    if(HNum!=9 && HNum!=OHNum){
+                        this.emit('listenRaw',{
+                            index:this.listeningIndex,
+                            type:'hat',
+                            axes_index,
+                            HNum
+                        } as RawEvent);
+                        return;
+                    }
                     return;
-                    this.listenMode=listenStatus.none;
                 }
-                return;
-            }
 
-            if(
-                Math.abs((Math.abs(old_value)-Math.abs(axes_value)))>0.75
-            ){
-                            /*
-                            if(axes_index==3||axes_index==4)return
-                            if(axes_index==9){
-                                //9 0 1.2857142857142856 0
-                                console.log(HNum,OHNum,axes_value,old_value)
-                                return
-                            }
-                            */
-                const Operation=axes_value>old_value?'+':'-'
-                this.emit('raw',{
-                    index:this.listeningIndex,
-                    type:'axes',axes_index,Operation});
-                //console.log('raw','axes',axes_index,Operation);//,old_value.toFixed(3),axes_value.toFixed(3))
-                return;
-                this.listenMode=listenStatus.none;
-            }
-        });
-        rawGamepad.buttons.forEach((gpBtn,button_index)=>{
-            const old_value=this.listenRawGamepad!.buttons[button_index].value;
-            /*
-            let isAnalog=false;
-            if(gpBtn.value>0.1 && gpBtn.value<1){
-                isAnalog=true;
-                //console.log('raw','buttonAnalog',button_index);//,old_value.toFixed(3),gpBtn.value.toFixed(3))
-            }
-            */
-            if(gpBtn.pressed){
-                this.emit('raw',{
-                    index:this.listeningIndex,
-                    type:'button',button_index});
-                //console.log('raw','button',button_index)
-                return;
-                this.listenMode=listenStatus.none;
-            }
-        });
+                if(
+                    Math.abs((Math.abs(old_value)-Math.abs(axes_value)))>0.75
+                ){
+                    const Operation=axes_value>old_value?'+':'-'
+                    this.emit('listenRaw',{
+                        index:this.listeningIndex,
+                        type:'axes',axes_index,Operation} as RawEvent);
+                    return;
+                }
+            });
+        }
+
+        if(this.listenRawType.button){
+            rawGamepad.buttons.forEach((gpBtn,button_index)=>{
+                if(gpBtn.pressed){
+                    this.emit('listenRaw',{
+                        index:this.listeningIndex,
+                        type:'button',button_index} as RawEvent);
+                    return;
+                }
+            });
+        }
     }
 
     //================================================================
@@ -537,7 +560,16 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
     
     protected defaultStandardMapping:mappingGroup={};
 
-    public setDefaultGamepadMapping(mapping:mappingGroup):void{
+    
+	public resetDefault(index:number):mappingGroup|undefined{
+        if(this.defaultStandardMapping){
+            this.currentMapping[index]=clone(this.defaultStandardMapping);
+        }
+        //*
+        return this.defaultStandardMapping;
+    }
+
+    public setDefaultMapping(mapping:mappingGroup):void{
         this.defaultStandardMapping=mapping;                  
     }
 
@@ -546,9 +578,9 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
         return true;
     }
 
-	public checkNotRepeat(id:number,buttonName:string,keyCode:string):boolean{
-        for(let key in this.currentMapping[id]){
-            if(this.currentMapping[id][key]===keyCode && !(buttonName==key)){
+	public checkNotRepeat(index:number,buttonName:string,keyCode:string):boolean{
+        for(let key in this.currentMapping[index]){
+            if(this.currentMapping[index][key]===keyCode && !(buttonName==key)){
                 return false
             }
         }
@@ -557,9 +589,9 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 
     
 
-    public override vibration(id: number,duration:number=300,strongMagnitude:number=1,weakMagnitude:number=1):void{//Promise<GamepadHapticsResult>{
-        if(this.gamePads[id]){
-            this.gamePads[id]!.vibration(duration,strongMagnitude,weakMagnitude);
+    public override vibration(index: number,duration:number=300,strongMagnitude:number=1,weakMagnitude:number=1):void{//Promise<GamepadHapticsResult>{
+        if(this.gamePads[index]){
+            this.gamePads[index]!.vibration(duration,strongMagnitude,weakMagnitude);
         }
         //return Promise.reject('no vibration');
     }

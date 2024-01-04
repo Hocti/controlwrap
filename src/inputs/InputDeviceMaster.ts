@@ -113,7 +113,7 @@ export default abstract class InputDeviceMaster extends EventEmitter{// implemen
             if (this.requirement!.ui_pair) {
                 for (let i = 0; i < this.requirement!.ui_optional.length; i++) {
                     const btnName = this.requirement!.ui_optional[i];
-                    if (!this.requirement!.ui_pair[btnName]) {
+                    if (btnName && !this.requirement!.ui_pair[btnName]) {
                         optional.push(btnName);
                     }
                 }

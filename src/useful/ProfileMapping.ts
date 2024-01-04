@@ -1,4 +1,4 @@
-import { ControllerProfile,mappingRequirement,ControlType,ControllerInfo } from './types';
+import { ControllerProfile,mappingRequirement,ControlType,ControllerInfo } from '../types';
 
 export class ProfileMapping {
 

@@ -24,7 +24,8 @@
 	"keywords": [
 		"controller",
 		"gamepad",
-		"keyboard"
+		"keyboard",
+		"multiplayer"
 	],
 	"readme": "README.md",
 	"bugs": "https://github.com/Hocti/controlwrap/issues",

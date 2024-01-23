@@ -4,7 +4,7 @@ import  {mouseInput} from '../types';
 import  {stopEvent} from '../utils/utils';
 import { Button } from './Button';
 
-const MOUSE_BUTTON_NAME:string[]=["left","middle","right","prev","next"];
+const MOUSE_BUTTON_NAME:string[]=["left","right","middle","prev","next"];
 
 export default class MouseMaster extends EventEmitter{
 

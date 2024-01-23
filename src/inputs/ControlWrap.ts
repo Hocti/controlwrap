@@ -193,7 +193,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
             });
         }
         result[UI_INDEX_OFFSET]={
-            source:ControlType.system,
+            //source:ControlType.KEYBOARD,
             ui_tap:[...ui_tap_set],
             ui_pressing:[...ui_pressing_set],
             ui_repeat:[...ui_repeat_set],

@@ -39,7 +39,7 @@ export type ButtonState={
 }
 
 export type Input = {
-	source:ControlType,
+	source?:ControlType,
 	sourceIndex?:number,
 	//有system時，所有其他keyboard UI input無效
 

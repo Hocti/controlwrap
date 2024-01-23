@@ -247,13 +247,15 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         return {
             source: ControlType.KEYBOARD,
             sourceIndex: id,
-            directionButton:directionButton as Record<dpad,ButtonState>,
-            mixedDpad:dpadResult as (dpadPress & {numpad:number} & xy),
             
-            doublePressDirection,
             ui_tap,
             ui_pressing,
             ui_repeat,
+
+            mixedDpad:dpadResult as (dpadPress & {numpad:number} & xy),
+            doublePressDirection,
+            directionButton:directionButton as Record<dpad,ButtonState>,
+
             button,
 
             //mapping:this.currentMapping[id]

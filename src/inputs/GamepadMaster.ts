@@ -284,14 +284,16 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 
         const result:Input={
             source:ControlType.GAMEPAD,
+            sourceIndex:index,
+
             ui_tap,
             ui_pressing,
             ui_repeat,
-            sourceIndex:index,
 
-            directionButton:inputResult.directionButton,
             mixedDpad,
             doublePressDirection,
+            directionButton:inputResult.directionButton,
+            
             button,
             //mapping:this.currentMapping[index]
 

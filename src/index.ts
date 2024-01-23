@@ -32,7 +32,7 @@ export {
 } from "./types";
 
 export {
-    buttonLayout
+    buttonLayout,
 } from "./config";
 
 export * from "./useful/InputHelper";

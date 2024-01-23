@@ -22,11 +22,13 @@
 
     <h1 id="f"></h1>
     <button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button><br/><br/>
+    <hr/>
+    (open console to see the result) <br/>
     index:<input type="number" id="ip_index" value=100 > <br/>
     <button id="btn_listen_controller">listen which key press on input id</button><br/>
     <button id="btn_map_all">btn_map_all</button><br/>
     <button id="btn_reset_Default">btn_reset_Default</button><br/>
-    <button id="map_raw_btn">map_raw_btn</button><br/>
+    <!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
     
     <hr>
     <div id="output"></div>
@@ -103,7 +105,7 @@ cwi.wrappedInit({
     'special':'Semicolon'
 }
 ],
-2
+2,true
 );
 
 /*
@@ -151,20 +153,43 @@ let lastH='';
 const etf=()=>{
     let h='';
 
-    const all=cwi.flushAll();
+    const all=cwi.update();
+
+    h+=`<h1>Main player id:${cwi.mainControllerIndex}</h1>`
     
-    for(let index in all){
+    for(let index in all.player){
         const indexNum=parseInt(index)
-        const input=all[indexNum]
+        const input=all.player[indexNum]
         const extra={}
-        if(input.source!=ControlType.system){
-            extra['index']=indexNum;
-            extra['name']=cwi.getName(indexNum);
-        }
-        const nameExtra=input.sourceIndex>0?' - '+(input.sourceIndex+1):'';
+        extra['type']='player';
+        extra['index']=indexNum;
+        extra['name']=cwi.getName(indexNum);
         
-        h+=dict2Table({...extra,...input})
+        const mapping=cwi.getAllMapping(indexNum)
+
+        h+=dict2Table({
+            type:'player',
+            index:indexNum,
+            name:cwi.getName(indexNum),
+            ...input,
+            mapping
+        })
     }
+    
+    if(all.mouse){
+        h+=dict2Table({
+            type:'mouse',
+            ...all.mouse})
+    }
+
+    h+=dict2Table({
+        type:'system keyboard',
+        ...all.system})
+    
+    h+=dict2Table({
+        type:'ui mixed',
+        ...all.ui})
+    
 
     if(lastH!=h){
         output.innerHTML=h
@@ -250,7 +275,7 @@ document.getElementById("btn_reset_Default").addEventListener('click',async()=>{
 
 })
 
-
+/*
 //TODO : mapping with long press bug, should be jump to next step mapping when the button released
 const mappingRaw=async(index,analog=2)=>{
     if(analog>2){
@@ -475,6 +500,7 @@ document.getElementById("map_raw_btn").addEventListener('click',async()=>{
     })
 
 })
+*/
    </script>
 </body>
 </html>

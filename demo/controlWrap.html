@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html{
+            background-color: #000;
+            color: white;
+        }
+        td{
+            border:1px solid grey;
+            padding: 2px 5px;
+        }
+        #output table{
+            float:left;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="f"></h1>
+    <button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button><br/><br/>
+    index:<input type="number" id="ip_index" value=100 > <br/>
+    <button id="btn_listen_controller">listen which key press on input id</button><br/>
+    <button id="btn_map_all">btn_map_all</button><br/>
+    <button id="btn_reset_Default">btn_reset_Default</button><br/>
+    <button id="map_raw_btn">map_raw_btn</button><br/>
+    
+    <hr>
+    <div id="output"></div>
+
+    <script>
+        let cwi,gmi
+    </script>
+    <script type="module">
+        
+import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer} from "../dist/controlwrap.esm.js";
+
+
+const output_f=document.getElementById("f");
+const output=document.getElementById("output");
+
+gmi=GamepadMaster.getInstance()
+cwi=ControlWrap.getInstance()
+
+cwi.wrappedInit({
+    direction:{
+        dpad:false,
+        analog:0
+    },
+    button:['attack','jump','defend','special'],
+    optional:['double','command'],
+    ui_optional:['prevTab','nextTab','info'],
+    ui_pair:{
+        'confirm':'attack',
+        'cancel':'jump'
+    }
+},{
+
+    'attack':'x',
+    'jump':'a',
+    'defend':'b',
+    'special':'y',
+
+    //optional
+    'double':'leftshoulder',
+    'command':'rightshoulder',
+
+    /*
+    ui button no need to assign in gamepad
+    //ui
+    'info':'back',
+    'prevTab':'leftshoulder',
+    'nextTab':'rightshoulder',
+    */
+},[{
+    'up':'KeyW',
+    'down':'KeyS',
+    'left':'KeyA',
+    'right':'KeyD',
+
+    'attack':'KeyF',
+    'jump':'KeyG',
+    'defend':['KeyH','KeyB'],
+    'special':'KeyR',
+
+    'double':'ShiftLeft',
+    'info':'Tab',
+    'command':'KeyQ',
+    'prevTab':'KeyQ',
+    'nextTab':'KeyE',
+},{
+    'up':'KeyI',
+    'down':'KeyK',
+    'left':'KeyJ',
+    'right':'KeyL',
+
+    'attack':'KeyP',
+    'jump':'BracketLeft',
+    'defend':'BracketRight',
+    'special':'Semicolon'
+}
+],
+2
+);
+
+/*
+console.log(cwi.getMappableKeys(0))
+console.log(cwi.getMappableKeys(2))
+console.log(cwi.getAllMapping(0))
+console.log(cwi.getAllMapping(1))
+*/
+
+cwi.setAllMapping(2,{
+    'up':'Numpad8',
+    'down':'Numpad2',
+    'left':'Numpad4',
+    'right':'Numpad6',
+    'attack':'Numpad5',
+    'jump':'Numpad1',
+    'defend':'Numpad3',
+    'special':'Numpad0'
+})
+
+
+let f=0;
+
+const dict2Table=(dict)=>{
+    let h=`<table>`
+        for(let key in dict){
+            if(dict[key] && dict[key].constructor == Object){
+                h+=`<tr>
+                    <td>${key}</td>
+                    <td>${dict2Table(dict[key])}</td>
+                    </tr>`
+            }else{
+
+                h+=`<tr>
+                    <td>${key}</td>
+                    <td>${JSON.stringify(dict[key])}</td>
+                    </tr>
+                    `
+            }
+        }
+        h+=`</table>`
+    return h;
+}
+let lastH='';
+const etf=()=>{
+    let h='';
+
+    const all=cwi.flushAll();
+    
+    for(let index in all){
+        const indexNum=parseInt(index)
+        const input=all[indexNum]
+        const extra={}
+        if(input.source!=ControlType.system){
+            extra['index']=indexNum;
+            extra['name']=cwi.getName(indexNum);
+        }
+        const nameExtra=input.sourceIndex>0?' - '+(input.sourceIndex+1):'';
+        
+        h+=dict2Table({...extra,...input})
+    }
+
+    if(lastH!=h){
+        output.innerHTML=h
+        lastH=h;
+    }
+    //output_f.innerHTML=++f
+}
+setInterval(etf,1000/60);
+
+document.getElementById("btn_listen_controller").addEventListener('click',()=>{
+    const index=parseInt(document.getElementById("ip_index").value)
+    console.log(index)
+    
+    cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
+        console.log('key_name',key_name)
+    }).catch(function(error) {
+        console.log('catch',error)
+    })
+})
+
+//cwi.allowMainPlayerUseAllController=true;
+
+document.getElementById("btn_listen_attack").addEventListener('click',()=>{
+    cwi.listenControllerIndexFromKeys(['attack','start','cancel']).then((controller_index)=>{
+        console.log('controller_index',controller_index)
+        cwi.mainControllerIndex=controller_index;
+    }).catch(function(error) {
+        console.log('catch',error)
+    })
+})
+
+const mapAllInConsole=async(index)=>{
+
+    const [cType,]=cwi.parseIndex(index);
+    const buttonNames=cwi.getMappableKeys(index);
+
+    const newMapping={}
+    let breakFlag=false;
+    for(let btnName of buttonNames.buttons){
+        console.info('please press',btnName)
+        await cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
+            console.log('mapped',btnName,key_name)
+            newMapping[btnName]=key_name
+        }).catch(function(error) {
+            breakFlag=true
+            //console.log('catch',error);
+        })
+        if(breakFlag){
+            console.log('mapping cancel')
+            return Promise.reject('mapping cancel');
+        }
+    }
+    for(let btnName of buttonNames.optional){
+        console.info('please press',btnName,'(press start or escape to skip)')
+        await cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
+            console.log('key_name',key_name)
+            newMapping[btnName]=key_name
+        }).catch(function(error) {
+            console.info('skiped ',btnName)
+        })
+    }
+    console.info('finish mapping:',newMapping)
+    return newMapping;
+}
+
+document.getElementById("btn_map_all").addEventListener('click',()=>{
+    const index=parseInt(document.getElementById("ip_index").value)
+
+    const oldMapping=cwi.getAllMapping(index);
+
+    mapAllInConsole(index).then((newMapping)=>{
+        cwi.setAllMapping(index,newMapping)
+    }).catch(function(error) {
+        console.log('catch cancel',error)
+    })
+    
+})
+
+
+document.getElementById("btn_reset_Default").addEventListener('click',async()=>{
+    const index=parseInt(document.getElementById("ip_index").value)
+    cwi.resetDefault(index)
+
+})
+
+
+//TODO : mapping with long press bug, should be jump to next step mapping when the button released
+const mappingRaw=async(index,analog=2)=>{
+    if(analog>2){
+        console.log('max 2 analog')
+        return;
+    }
+    const [cType,cIndex]=cwi.parseIndex(index);
+    const gpExtra=gmi.getGamepadExtra(cIndex)
+    if(!gpExtra){
+        console.log('no gamepad')
+        return;
+    }
+    if(gpExtra.info.standard){
+        console.log('standard gamepad no need to mapping')
+        //return;
+    }
+    const maxAxes=gpExtra.info.originInfo.axes.length;
+    const maxBtn=gpExtra.info.originInfo.buttons.length;
+    if(maxAxes<analog*2){
+        console.log('analog not enough')
+        return;
+    }
+
+    const usedButton=new Set();
+    const usedAxes=new Set();
+    const usedHat=new Set();
+
+    let btn_mapping={};
+    let axes_mapping={};
+    let hat_mapping={};
+
+    let step=1;
+    let quit=false;
+
+    const directions=['up','down','left','right']
+    let currDpadIndex=0
+
+    const analogs=['left','right']
+    let currAnalogIndex=0
+    let currAnalogXYIndex=0
+
+    const ab=['a','b']
+    let currABIndex=0
+    const otherButtons=['x','y','leftshoulder','rightshoulder','lefttrigger','righttrigger','back','leftstick','rightstick']
+    let currOtherIndex=0
+    let dpadType='';
+
+    gmi.saveAllRelaseGPState(cIndex);
+
+    do{
+        if(step===1){//start
+            console.info('press start button (press keyboard esc to cancel)')
+            await gmi.listenRaw(cIndex,true,false).then((e)=>{
+                btn_mapping['start']=e.button_index;
+                usedButton.add(e.button_index);
+                console.info('mapped start button to: '+e.button_index)
+
+                step++;
+
+            }).catch(function(error) {
+                quit=true;
+            })
+        }
+        
+        if(step===2){//dpad
+            console.info(`press dpad ${directions[currDpadIndex]} (press keyboard esc to cancel)`)
+            await gmi.listenRaw(cIndex,true,true).then((e)=>{
+                    console.log(e)
+                if(e.type==='button'){
+                    if(usedButton.has(e.button_index)){
+                        return;
+                    }
+                    btn_mapping[directions[currDpadIndex]]=e.button_index;
+                    usedButton.add(e.button_index);
+                    currDpadIndex++;
+                    dpadType='button';
+                }else if(e.type==='axes'){
+                    const axesName=`${e.Operation}${e.axes_index}`;
+                    if(usedAxes.has(axesName)){
+                        return;
+                    }
+
+                    usedAxes.add(axesName);
+                    axes_mapping[directions[currDpadIndex]]=axesName;
+
+                    currDpadIndex++;
+                    const axesName2=`${e.Operation=='+'?'-':'+'}${e.axes_index}`;
+                    axes_mapping[directions[currDpadIndex]]=axesName2;
+                    usedAxes.add(axesName2);
+
+                    currDpadIndex++;
+                    dpadType='axes';
+
+                }else if(e.type==='hat'){
+                    if(usedHat.has(e.HNum)){
+                        return;
+                    }
+
+                    dpadType='hat';
+                    axes_mapping['hat']=e.axes_index;
+                    usedAxes.add(e.axes_index);
+
+                    usedHat.add(e.HNum);
+                    hat_mapping[directions[currDpadIndex]]=e.HNum;
+
+                    currDpadIndex++;
+                    const hat2=gamepad_standardizer.oppositeDpad[e.HNum];
+                    hat_mapping[directions[currDpadIndex]]=hat2;
+                    usedHat.add(hat2);
+
+                    currDpadIndex++;
+                }
+                                
+                console.info(e)
+            }).catch(function(error) {
+                console.log('step2 catch',error);
+                quit=true;
+            })
+            if(currDpadIndex>=directions.length){
+                step++;
+            }
+        }
+
+        if(step===3){//analog
+            if(currAnalogIndex>=analog){
+                step++;
+                continue;
+            }
+
+            console.info(`push ${analogs[currAnalogIndex]} analog ${directions[currAnalogXYIndex]} (press keyboard esc to quit)`)
+            await gmi.listenRaw(cIndex,false,true).then((e)=>{
+                    const axesName=`${e.Operation}${e.axes_index}`;
+                    if(usedAxes.has(axesName)){
+                        return;
+                    }
+
+                    usedAxes.add(axesName);
+                    axes_mapping[`${analogs[currAnalogIndex]}${directions[currAnalogXYIndex]}`]=axesName;
+
+                    currAnalogXYIndex++;
+                    const axesName2=`${e.Operation=='+'?'-':'+'}${e.axes_index}`;
+                    axes_mapping[`${analogs[currAnalogIndex]}${directions[currAnalogXYIndex]}`]=axesName2;
+                    usedAxes.add(axesName2);
+
+                    currAnalogXYIndex++;
+            }).catch(function(error) {
+                quit=true;
+            })
+            if(currAnalogXYIndex>=directions.length){
+                currAnalogIndex++;
+                currAnalogXYIndex=0;
+            }
+        }
+
+        //confirm,cancel=a,b
+        //1) [right side panel] button on down side
+        //2) the button on (1) right side
+        if(step===4){
+            console.info(`press ${ab[currABIndex]} (press keyboard esc to cancel)`)
+            await gmi.listenRaw(cIndex,true,false).then((e)=>{
+                if(usedButton.has(e.button_index)){
+                    return;
+                }
+                btn_mapping[ab[currABIndex]]=e.button_index;
+                usedButton.add(e.button_index);
+                currABIndex++;
+            }).catch(function(error) {
+                quit=true;
+            })
+            if(currABIndex>=ab.length){
+                step++;
+            }
+        }
+
+        if(step===5){//optional button
+            console.info(`press ${otherButtons[currOtherIndex]} (press keyboard esc or gamepad start to skip)`)
+            await gmi.listenRaw(cIndex,true,false).then((e)=>{
+                if(e.button_index===btn_mapping['start']){
+                    btn_mapping[otherButtons[currOtherIndex]]=undefined;
+                    currOtherIndex++
+                    return;
+                }
+                if(usedButton.has(e.button_index)){
+                    return;
+                }
+                btn_mapping[otherButtons[currOtherIndex]]=e.button_index;
+                usedButton.add(e.button_index);
+                currOtherIndex++
+            }).catch(function(error) {
+                btn_mapping[otherButtons[currOtherIndex]]=undefined;
+                currOtherIndex++
+            })
+            if(currOtherIndex>=otherButtons.length || usedButton.size==maxBtn){
+                step++
+            }
+        }
+        
+        if(quit){
+            console.log('mapping cancel')
+            return Promise.reject('mapping cancel');
+        }
+    }while(step<6)
+    
+    return {
+        btn_mapping,
+        axes_mapping,
+        hat_mapping
+    };
+}
+
+document.getElementById("map_raw_btn").addEventListener('click',async()=>{
+    const index=parseInt(document.getElementById("ip_index").value);
+    
+
+    //set set layout (for swapAB)
+    //set analog 0~2
+
+    mappingRaw(index,2).then((e)=>{
+        console.log('map result',e)
+    }).catch(function(error) {
+        console.log('map unchange')
+    })
+
+})
+   </script>
+</body>
+</html>

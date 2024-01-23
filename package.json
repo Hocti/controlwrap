@@ -1,0 +1,60 @@
+{
+	"name": "controlwrap",
+	"version": "1.0.0",
+	"description": "wrap all gamepad,keyboard control in one place, output as your standard's conroller input format",
+	"main": "./dist/controlwrap.cjs.js",
+	"module": "./dist/controlwrap.esm.js",
+	"bundle": "./dist/controlwrap.js",
+	"types": "./dist/controlwrap.d.ts",
+	"namespace": "controlwrap",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/controlwrap.d.ts",
+				"default": "./dist/controlwrap.esm.js"
+			},
+			"require": {
+				"types": "./dist/controlwrap.d.ts",
+				"default": "./dist/controlwrap.cjs.js"
+			}
+		}
+	},
+	"author": "hocti",
+	"license": "MIT",
+	"keywords": [
+		"controller",
+		"gamepad",
+		"keyboard",
+		"multiplayer"
+	],
+	"readme": "README.md",
+	"bugs": "https://github.com/Hocti/controlwrap/issues",
+	"scripts": {
+		"watch": "cross-env NODE_ENV=DEV rollup -c --watch",
+		"build": "cross-env NODE_ENV=production rollup -c"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Hocti/controlwrap/"
+	},
+	"files": [
+		"./dist/",
+		"LICENSE",
+		"package.json",
+		"README.md"
+	],
+	"devDependencies": {
+		"@rollup/plugin-commonjs": "^25.0.7",
+		"@rollup/plugin-node-resolve": "^15.2.3",
+		"cross-env": "^7.0.3",
+		"esbuild": "^0.19.9",
+		"rollup": "^4.9.0",
+		"rollup-plugin-dts": "^6.1.0",
+		"rollup-plugin-esbuild": "^6.1.0",
+		"typescript": "^5.3.3"
+	},
+	"dependencies": {
+		"eventemitter3": "^5.0.1",
+		"gamepad_standardizer": "^1.0.4"
+	}
+}

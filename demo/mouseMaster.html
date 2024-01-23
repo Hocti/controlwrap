@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        html{
+            background-color: #000;
+            color: white;
+        }
+        td{
+            border:1px solid grey;
+            padding: 2px 5px;
+        }
+        #output table{
+            float:left;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="f"></h1>
+    <button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button><br/><br/>
+    index:<input type="number" id="ip_index" value=100 > <br/>
+    <button id="btn_listen_controller">listen which key press on input id</button><br/>
+    <button id="btn_map_all">btn_map_all</button><br/>
+    <button id="btn_reset_Default">btn_reset_Default</button><br/>
+    <button id="map_raw_btn">map_raw_btn</button><br/>
+    
+    <hr>
+    <div id="output"></div>
+
+    <script>
+        let cwi,mmi
+    </script>
+    <script type="module">
+        
+import {ControlWrap,MouseMaster,ControlType,gamepad_standardizer} from "../dist/controlwrap.esm.js";
+
+
+const output_f=document.getElementById("f");
+const output=document.getElementById("output");
+
+mmi=MouseMaster.getInstance();
+mmi.init();
+mmi.blockRightClick=true;
+mmi.blockPrevNext=true;
+mmi.blockMiddle=true;
+mmi.hideCursor();
+mmi.showCursor();
+
+let lastH='';
+const etf=()=>{
+    let h='';
+
+    const all=mmi.flush();
+    
+
+    if(lastH!=h){
+        output.innerHTML=h
+        lastH=h;
+    }
+    //output_f.innerHTML=++f
+}
+setInterval(etf,1000/60);
+   </script>
+</body>
+</html>

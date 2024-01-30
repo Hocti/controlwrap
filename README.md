@@ -28,7 +28,7 @@ npm install controlwrap
 
 or using jsdelivr
 ```
-<script src="https://cdn.jsdelivr.net/npm/controlwrap/dist/controlwrap.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/controlwrap@latest/dist/controlwrap.js"></script>
 ```
 
 ## how to use

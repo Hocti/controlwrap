@@ -115,16 +115,20 @@ export default class MouseMaster extends EventEmitter{
         }
     }
 
+    public listenXY:boolean=false;
+
     public flush(): mouseInput{
         let result:mouseInput={
-            xy:{x:this.latestxy.x,y:this.latestxy.y},
-            xyDelta:{
-                x:this.lastxy.x-this.latestxy.x,
-                y:this.lastxy.y-this.latestxy.y
-            },
             delta:this.delta,
             buttons:{}
         };
+        if(this.listenXY){
+            result.xy={x:this.latestxy.x,y:this.latestxy.y};
+            result.xyDelta={
+                x:this.lastxy.x-this.latestxy.x,
+                y:this.lastxy.y-this.latestxy.y
+            }
+        }
         for(let key in this.buttons){
             result.buttons[key]=this.buttons[key].flush();
         }

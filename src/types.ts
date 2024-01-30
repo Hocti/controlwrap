@@ -88,8 +88,8 @@ export type latestLayoutGroup = {
 
 
 export type mouseInput={
-    xy:xy,
-    xyDelta:xy,
+    xy?:xy,
+    xyDelta?:xy,
     delta:number,
     buttons:Record<string,ButtonState>
 }

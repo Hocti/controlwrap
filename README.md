@@ -74,7 +74,7 @@ cwi.wrappedInit({
 
 //under game loop
 const etf=()=>{
-    const allInputs=cwi.flushAll();
+    const allInputs=cwi.update();
     //all input from gamepad,keyboard,mouse are wrapped here
     // watch the demo site to see what result would got
 }

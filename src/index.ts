@@ -36,6 +36,7 @@ export {
 } from "./config";
 
 export * from "./useful/InputHelper";
+export * from "./useful/fighterHelper";
 
 export {getUITap,getUIsTap,joinState,setMinDoubleFrame} from "./inputs/Button";
 

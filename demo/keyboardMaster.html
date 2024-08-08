@@ -111,6 +111,7 @@
             return h;
         }
         let lastH='';
+        let framePassed=0;
         const etf=()=>{
             let h='';
 
@@ -121,6 +122,10 @@
                 const input=all[indexNum]
                 h+=dict2Table(input)
             }
+            if(all[1000].ui_tap.length!=0){
+                console.log('framePassed',framePassed,all[1000].ui_tap)
+            }
+            framePassed++
 
             if(lastH!=h){
                 output.innerHTML=h

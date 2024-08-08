@@ -38,35 +38,39 @@ export type ButtonState={
     pressFrame:number;
 }
 
-export type Input = {
-	source?:ControlType,
-	sourceIndex?:number,
-	//有system時，所有其他keyboard UI input無效
-
+export type gameInput = {
     //raw direction
-	dpad?:dpadPress & {numpad:number} & xy,
-	analog?:directionWrap,
-	analog_right?:directionWrap,
+	dpad?:dpadPress & {numpad:number} & xy,//gamepad dpad only, not analog
+	analog?:directionWrap,//left analog only
+	analog_right?:directionWrap,//right analog only
 
-    //processed direction
-	directionButton?:Record<dpad,ButtonState>,
+    //processed direction, mixed with left analog and dpad
     mixedDpad?:dpadPress & {numpad:number} & xy,
+	directionButton?:Record<dpad,ButtonState>,
     doublePressDirection?:boolean,
 
     //button
 	button?:Record<string,ButtonState>,
+
+    //extra
+	//command?:string[],
+}
+export type systemInput = {
+	source?:ControlType,
+	sourceIndex?:number,
+	//有system時，所有其他keyboard UI input無效
+
+    //ui
 	ui_tap:string[],//confirm,pause
 	ui_pressing:string[],//confirm,pause
 	ui_repeat:string[],//confirm,pause
-
-    //extra
-	command?:string[],
 }
+export type Input = systemInput & gameInput;
 
 export type mappingRequirement = {
 	//type:ControlType,
 	direction:{
-		dpad:boolean,
+		dpad:boolean,//need pure gamepad dpad?
 		analog:0|1|2
 	},
 	button:string[],

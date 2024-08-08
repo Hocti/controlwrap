@@ -2,7 +2,7 @@ import {EventEmitter} from 'eventemitter3';
 
 
 import { dpad,dpadPress, getDpadDirection,xy } from "gamepad_standardizer";
-import  {ButtonState ,mappingGroup,Input,ControlType,mappingRequirement,latestLayoutGroup} from '../types';
+import  {ButtonState ,mappingGroup,Input,ControlType,mappingRequirement,latestLayoutGroup,systemInput} from '../types';
 import  {inEnum,findKeyByValue,stopEvent,clone} from '../utils/utils';
 import { Button,getUITap,joinState,isRepeat } from './Button';
 import InputDeviceMaster,{ listenStatus } from './InputDeviceMaster';
@@ -182,6 +182,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
                 continue;
             }
 
+            //other ui button
             if(this.requirement!.button.indexOf(keyName)>=0 || (this.requirement!.optional && this.requirement!.optional.indexOf(keyName)>=0)){
                 button[keyName]=status;
                 const ui_btn_name=findKeyByValue(this.requirement!.ui_pair,keyName);
@@ -304,7 +305,6 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
         const result:Record<number,Input>={};
 
-
         //keyboard master:
         result[SYSTEM_INDEX_OFFSET]=this.getSystemInput(keyStatus);
 
@@ -316,6 +316,33 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         //this.lastDownKey=new Set(this.downKey);
         this.downKey.clear();
 
+        return result;
+    }
+    
+    private unchangeCache:Record<string, number>={}
+    public flushUI():Record<number,systemInput>{
+        const keyStatus:Record<string,ButtonState>={};
+        for(let keyCode in this.buttons){
+            const press=this.downKey.has(keyCode);
+            const lastPress=this.unchangeCache[keyCode]??0;
+            this.unchangeCache[keyCode]=press?(this.unchangeCache[keyCode]?this.unchangeCache[keyCode]+1:1):0;
+            keyStatus[keyCode]={
+                press:press,
+                just:press&&lastPress==0,double:false,tap:false, pressFrame:this.unchangeCache[keyCode]
+            };
+        };
+
+        const result:Record<number,systemInput>={};
+
+        //keyboard master:
+        result[SYSTEM_INDEX_OFFSET]=this.getSystemInput(keyStatus);
+
+        //keyboards:
+        for(let i=0;i<this.totalKeyboard;i++){
+            const {source,sourceIndex,ui_tap,ui_pressing,ui_repeat}=this.getInput(i,keyStatus);
+            result[i]={source,sourceIndex,ui_tap,ui_pressing,ui_repeat}
+        }
+        
         return result;
     }
 

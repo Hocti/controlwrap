@@ -31,6 +31,7 @@
     <!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
     
     <hr>
+    <div id="fightoutput"></div>
     <div id="output"></div>
 
     <script>
@@ -38,11 +39,12 @@
     </script>
     <script type="module">
         
-import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer} from "../dist/controlwrap.esm.js";
+import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer,fightingInput,str2Command,fightingInputMulti} from "../dist/controlwrap.esm.js";
 
 
 const output_f=document.getElementById("f");
 const output=document.getElementById("output");
+const fightoutput=document.getElementById("fightoutput");
 
 gmi=GamepadMaster.getInstance()
 cwi=ControlWrap.getInstance()
@@ -105,7 +107,7 @@ cwi.wrappedInit({
     'special':'Semicolon'
 }
 ],
-2,true
+2,false
 );
 
 /*
@@ -128,7 +130,7 @@ cwi.setAllMapping(2,{
 
 
 let f=0;
-
+let mainInputHistory=[];
 const dict2Table=(dict)=>{
     let h=`<table>`
         for(let key in dict){
@@ -151,12 +153,41 @@ const dict2Table=(dict)=>{
 }
 let lastH='';
 let framePassed=0;
+let lastDir=5
+
+const Commands={
+    623:str2Command('623attack'),
+    //613:str2Command('613attack'),
+    236:str2Command('26attack'),
+    //16:str2Command('16attack'),
+    63214:str2Command('624attack'),
+    '6a':str2Command('6attack'),
+
+
+    '236k':str2Command('236jump/defend'),
+    'super ball':str2Command('6426jump+defend'),
+    'super1':str2Command('2426attack'),
+    'super  max':str2Command('2426attack+jump'),
+    'super2':str2Command('2626attack'),
+
+    '22':str2Command('252attack'),
+
+
+    /*
+    236:str2Command('26attack'),
+    214:str2Command('26attack',true),
+    236236:str2Command('26attack',false,2),
+    iori:str2Command('26attack',false,4)
+    */
+}
+
 const etf=()=>{
     let h='';
 
-    const all=cwi.update(true);
+    const all=cwi.update();
 
     h+=`<h1>Main player id:${cwi.mainControllerIndex}</h1>`
+
     
     for(let index in all.player){
         const indexNum=parseInt(index)
@@ -175,6 +206,48 @@ const etf=()=>{
             ...input,
             mapping
         })
+
+        //
+        if(indexNum===cwi.mainControllerIndex){
+            let btns=[];
+            for(let key in input.directionButton){
+                if(input.directionButton[key].just && input.directionButton[key].press){
+                    break;
+                }
+            }
+            //if(input.mixedDpad.numpad!=lastDir){
+                if(input.mixedDpad.numpad!=5){
+                    btns.push(input.mixedDpad.numpad)
+                }
+                //lastDir=input.mixedDpad.numpad;
+            //}
+            for(let key in input.button){
+                if(input.button[key].just && input.button[key].press){
+                    btns.push(key)
+                }
+            }
+            mainInputHistory.push(btns.join(','))
+            if(mainInputHistory.length>80){
+                mainInputHistory.shift();
+            }
+            if(btns.length){
+                fightoutput.innerHTML=mainInputHistory.filter((e)=>e!=='').join('_');
+                let result=fightingInputMulti(Commands,mainInputHistory)
+                let work=false;
+                for(let key in result){
+                    if(result[key]){
+                        console.log(key,result[key])
+                        work=true;
+                    }
+                }
+                if(work){
+                    console.log(fightoutput.innerHTML)
+                    mainInputHistory=[];
+                }else if(btns.length>1){
+                    console.log(fightoutput.innerHTML)
+                }
+            }
+        }
     }
     
     if(all.mouse){
@@ -192,7 +265,7 @@ const etf=()=>{
         ...all.ui})
 
     if(all.ui.ui_tap.length!=0){
-        console.log('framePassed',framePassed,all.ui.ui_tap)
+        //console.log('framePassed',framePassed,all.ui.ui_tap)
     }
     
 
@@ -202,8 +275,10 @@ const etf=()=>{
     }
     //output_f.innerHTML=++f
     framePassed++;
+    requestAnimationFrame(etf)
 }
-setInterval(etf,1000/60);
+//setInterval(etf,1000/60);
+requestAnimationFrame(etf)
 
 document.getElementById("btn_listen_controller").addEventListener('click',()=>{
     const index=parseInt(document.getElementById("ip_index").value)
@@ -217,15 +292,16 @@ document.getElementById("btn_listen_controller").addEventListener('click',()=>{
 })
 
 //cwi.allowMainPlayerUseAllController=true;
-
-document.getElementById("btn_listen_attack").addEventListener('click',()=>{
+const listen_attack=()=>{
     cwi.listenControllerIndexFromKeys(['attack','start','cancel']).then((controller_index)=>{
         console.log('controller_index',controller_index)
         cwi.mainControllerIndex=controller_index;
     }).catch(function(error) {
         console.log('catch',error)
     })
-})
+}
+document.getElementById("btn_listen_attack").addEventListener('click',listen_attack)
+setTimeout(listen_attack,1000)
 
 const mapAllInConsole=async(index)=>{
 

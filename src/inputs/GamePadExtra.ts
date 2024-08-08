@@ -98,7 +98,9 @@ export default class GamePadExtra{
 
     }
 
-    public flush(gamepad:Gamepad):InputPreprocess{
+    private unchangeCache:Record<string, number>={}
+
+    public flush(gamepad:Gamepad,unchange:boolean=false):InputPreprocess{
         if(!this.info){
             return {button:{},
             directionButton:{
@@ -133,6 +135,16 @@ export default class GamePadExtra{
         const bs=getButtonPress(gamepad,this.info!,true);
         for(let k in this.btn_names){
             if(this.btn_names[k] && this.buttons[this.btn_names[k]!]){
+                const press=bs[k]===true;
+                const lastPress=this.unchangeCache[k]??0;
+                this.unchangeCache[k]=press?(this.unchangeCache[k]?this.unchangeCache[k]+1:1):0;
+                if(unchange){//*
+                    thisInput.button[this.btn_names[k]!]={
+                        press:press,
+                        just:press&&lastPress==0,double:false,tap:false, pressFrame:this.unchangeCache[k]
+                    };
+                    continue;
+                }
                 if(bs[k]){
                     this.buttons[this.btn_names[k]!].press()
                 }else{
@@ -151,7 +163,15 @@ export default class GamePadExtra{
                 press=true;
             } 
             //|| (thisInput.direction!.leftAnalog?[kk]??false);
-
+            const lastPress=this.unchangeCache[kk]??0;
+            this.unchangeCache[kk]=press?(this.unchangeCache[kk]?this.unchangeCache[kk]+1:1):0;
+            if(unchange){//*
+                thisInput.directionButton[kk]={
+                    press:press,
+                    just:press&&lastPress==0,double:false,tap:false, pressFrame:this.unchangeCache[kk]
+                };
+                continue;
+            }
             if(press){
                 this.directionButton[kk].press();
             }else{

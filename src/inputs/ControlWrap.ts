@@ -1,5 +1,5 @@
 import {EventEmitter} from 'eventemitter3';
-import  {latestLayoutGroup ,InputGroup,ControlType,Input,mappingGroup,mappingRequirement,InputSource} from '../types';
+import  {latestLayoutGroup ,InputGroup,ControlType,Input,systemInput,mappingGroup,mappingRequirement,InputSource} from '../types';
 
 import {IControllerMaster} from './IControllerMaster';
 import GamepadMaster from './GamepadMaster';
@@ -134,8 +134,8 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
     };
     private lastButtonLayout:latestLayoutGroup=this.defaultButtonLayout;
     
-    public update():InputGroup{
-        const ips=this.flushAll();
+    public update(uiOnly:boolean=false):InputGroup{
+        const ips:Record<number, Input>=this.flushInner(uiOnly);
         const result:InputGroup={
             [InputSource.system]:ips[SYSTEM_INDEX_OFFSET],
             [InputSource.ui]:ips[UI_INDEX_OFFSET],
@@ -152,7 +152,15 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
         return result;
     }
 
+    public flushUI():Record<number,systemInput>{
+        return this.flushInner(true);
+    }
+
     public flushAll():Record<number,Input>{
+        return this.flushInner(false);
+    }
+
+    private flushInner(uiOnly:boolean=false):Record<number,Input>{
         const result:Record<number,Input>={};
         let thisInputIndex:number=this._lastInputIndex;
         let ui_tap_set=new Set<string>();
@@ -161,7 +169,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 
         for (const controlType of Object.values(ControlType)) {
             if (ControlWrap.masterRecord[controlType] && this.listening[controlType]) {
-                const re=ControlWrap.masterRecord[controlType]!.flushAll()
+                const re=uiOnly?ControlWrap.masterRecord[controlType]!.flushUI():ControlWrap.masterRecord[controlType]!.flushAll()
                 for(let index in re){
                     const mixedIndex=this.makeIndex(controlType,Number(index));
                     result[mixedIndex]=re[index];

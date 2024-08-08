@@ -50,15 +50,15 @@ export function L1R1(ip:Input):number{
 
 export function UDLRpressing(ip:Input):xy{
     return {
-        x:pressing(ip,UIButton.up)?-1:(pressing(ip,UIButton.down)?1:0),
-        y:pressing(ip,UIButton.left)?-1:(pressing(ip,UIButton.right)?1:0),
+        x:pressing(ip,UIButton.left)?-1:(pressing(ip,UIButton.right)?1:0),
+        y:pressing(ip,UIButton.up)?-1:(pressing(ip,UIButton.down)?1:0),
     }       
 }
 
 export function UDLR(ip:Input):xy{
     return {
-        x:tapOrRepeat(ip,UIButton.up)?-1:(tapOrRepeat(ip,UIButton.down)?1:0),
-        y:tapOrRepeat(ip,UIButton.left)?-1:(tapOrRepeat(ip,UIButton.right)?1:0),
+        x:tapOrRepeat(ip,UIButton.left)?-1:(tapOrRepeat(ip,UIButton.right)?1:0),
+        y:tapOrRepeat(ip,UIButton.up)?-1:(tapOrRepeat(ip,UIButton.down)?1:0),
     }       
 }
 

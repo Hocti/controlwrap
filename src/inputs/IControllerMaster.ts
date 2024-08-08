@@ -1,5 +1,5 @@
 import {EventEmitter} from 'eventemitter3';
-import {mappingRequirement,Input,mappingGroup,latestLayoutGroup} from "../types";
+import {mappingRequirement,Input,systemInput,mappingGroup,latestLayoutGroup} from "../types";
 import { buttonLayout } from '../config';
 
 //<ControllerInstance,InputType,MappingType>
@@ -10,6 +10,7 @@ export interface IControllerMaster extends EventEmitter{
     count():number;
     getIndexs():number[];
     flushAll(): Record<number,Input>;
+    flushUI(): Record<number,systemInput>;
     getName(index: number):string;
 
     //listen

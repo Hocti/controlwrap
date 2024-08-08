@@ -1,7 +1,7 @@
 import { ButtonState } from "../types";
 
 export const UI_REPEAT_STARTFRAME=60
-export const UI_REPEAT_FRAME=30
+export const UI_REPEAT_FRAME=10
 
 //have press:press || (!press && tap)
 //have press:press || (!press && tap)
@@ -13,7 +13,7 @@ export function isRepeat(bs:ButtonState):boolean{
 }
 export function getUITap(bs:ButtonState | undefined):boolean{
     if(!bs)return false
-    return (bs.press && bs.just) || (!bs.press && bs.tap) || bs.double;
+    return (bs.press && bs.just) || (!bs.press && bs.tap);
 }
 export function getUIsTap(bss:Record<string,ButtonState>):Record<string,boolean>{
     const result:Record<string,boolean>={}

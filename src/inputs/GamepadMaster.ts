@@ -2,7 +2,7 @@ import {EventEmitter} from 'eventemitter3';
 
 //import * as gamepad_standardizer from "gamepad_standardizer"
 import { dpad,DP_BUTTON_NAME, getDpadDirection,xy } from "gamepad_standardizer";
-import  {ButtonState ,mappingGroup,Input,AllUIButton,mappingRequirement,ControlType,latestLayoutGroup} from '../types';
+import  {ButtonState ,mappingGroup,Input,systemInput,AllUIButton,mappingRequirement,ControlType,latestLayoutGroup} from '../types';
 import  {clone,findKeyByValue, inEnum} from '../utils/utils';
 import { Button,isRepeat,getUITap, joinState } from './Button';
 import InputDeviceMaster,{ listenStatus } from './InputDeviceMaster';
@@ -150,6 +150,19 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
         }
         return result;
     }
+    
+    public flushUI():Record<number,systemInput>{
+        const result:Record<number,systemInput>={};
+        const gps=navigator.getGamepads();
+        for(let i=0,t=gps.length;i<t;i++){
+            if(this.gamePads[i]===undefined){
+                continue;
+            }
+            const inputResult=this.gamePads[i]!.flush(gps[i]!,true);//*
+            result[i]=this.processInput(i,inputResult,true);
+        }
+        return result;
+    }
 
     private getPairFromBtnName(btnName:string,swapAB:boolean=false):string{
         if(btnName=='a'){
@@ -200,7 +213,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
         }
     }
 
-    private processInput(index:number,inputResult:InputPreprocess):Input{
+    private processInput(index:number,inputResult:InputPreprocess,uiOnly:boolean=false):Input{
         let doublePressDirection=false;
         let justDouble=false;
         const button:Record<string,ButtonState>={};
@@ -238,6 +251,13 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
                 ui_repeat.push(btnName);
             }
             doublePressDirection=doublePressDirection || inputResult.directionButton[btnName].double;
+        }
+        if(uiOnly)return {
+            source:ControlType.GAMEPAD,
+            sourceIndex:index,
+            ui_tap,
+            ui_pressing,
+            ui_repeat,
         }
 
         const mixedDpad:any=getDpadDirection({
@@ -305,7 +325,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
             result.analog=inputResult.direction!.leftAnalog!
         }
         if(this.requirement!.direction.analog>=2){
-            result.dpad=inputResult.direction!.rightAnalog!
+            result.analog_right=inputResult.direction!.rightAnalog!
         }
         
         return result

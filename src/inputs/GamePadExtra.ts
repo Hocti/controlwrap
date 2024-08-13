@@ -188,8 +188,8 @@ export default class GamePadExtra{
     }
     
     public vibration(duration:number=500,strongMagnitude:number=1,weakMagnitude:number=0):Promise<GamepadHapticsResult>|undefined{
-        if(this.lastGamepad.vibrationActuator?.type){
-            return this.lastGamepad.vibrationActuator!.playEffect("dual-rumble", {
+        if(this.lastGamepad.vibrationActuator){
+            return this.lastGamepad.vibrationActuator.playEffect("dual-rumble", {
                 //startDelay,
                 duration,
                 // A low-frequency vibration

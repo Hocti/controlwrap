@@ -37,6 +37,8 @@ export {
 
 export * from "./useful/InputHelper";
 export * from "./useful/fighterHelper";
+import pressHistory from "./useful/pressHistory";
+export {pressHistory};
 
 export {getUITap,getUIsTap,joinState,setMinDoubleFrame} from "./inputs/Button";
 

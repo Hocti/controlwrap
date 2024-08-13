@@ -134,32 +134,27 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
     }
 
     public flushAll():Record<number,Input>{
+        return this.flushInner(false);
+    }
+    
+    public flushUI():Record<number,systemInput>{
+        return this.flushInner(true);
+    }
+
+    private flushInner(uiOnly:boolean=false):Record<number,Input>{
         const result:Record<number,Input>={};
         const gps=navigator.getGamepads();
         for(let i=0,t=gps.length;i<t;i++){
             if(this.gamePads[i]===undefined){
                 continue;
             }
-            const inputResult=this.gamePads[i]!.flush(gps[i]!);//*
+            const inputResult=this.gamePads[i]!.flush(gps[i]!,uiOnly);
             if(this.listenMode===listenStatus.raw && this.listeningIndex===i){
                 this.processRaw(gps[i]!)
             }else if(this.listenMode!==listenStatus.none){
                 this.listenDown(i,inputResult)
             }
-            result[i]=this.processInput(i,inputResult);
-        }
-        return result;
-    }
-    
-    public flushUI():Record<number,systemInput>{
-        const result:Record<number,systemInput>={};
-        const gps=navigator.getGamepads();
-        for(let i=0,t=gps.length;i<t;i++){
-            if(this.gamePads[i]===undefined){
-                continue;
-            }
-            const inputResult=this.gamePads[i]!.flush(gps[i]!,true);//*
-            result[i]=this.processInput(i,inputResult,true);
+            result[i]=this.processInput(i,inputResult,uiOnly);
         }
         return result;
     }

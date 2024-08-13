@@ -39,7 +39,7 @@
     </script>
     <script type="module">
         
-import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer,fightingInput,str2Command,fightingInputMulti} from "../dist/controlwrap.esm.js";
+import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer,fightingInput,str2Command,fightingInputMulti,pressHistory} from "../dist/controlwrap.esm.js";
 
 
 const output_f=document.getElementById("f");
@@ -181,13 +181,35 @@ const Commands={
     */
 }
 
+let frame=0;
+
 const etf=()=>{
     let h='';
-
+    frame++;
     const all=cwi.update();
 
     h+=`<h1>Main player id:${cwi.mainControllerIndex}</h1>`
 
+    pressHistory.getInstance().addHistory(all.player)
+
+//console.log(pressHistory.getInstance().getShorten(cwi.mainControllerIndex))
+const mainHisStr=pressHistory.getInstance().getShorten(cwi.mainControllerIndex)
+
+const dou=pressHistory.getInstance().doublePressDirection(cwi.mainControllerIndex,20)
+if(dou){
+    console.log('double press',dou)
+    pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex)
+}
+
+if(all.player[100] && all.player[100].button.attack.just && all.player[100].button.attack.press){
+    console.log('just attack',frame)
+}
+
+const dou2=pressHistory.getInstance().doublePress(cwi.mainControllerIndex,'attack',20)
+if(dou2){
+    console.log('double attack')
+    pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex)
+}
     
     for(let index in all.player){
         const indexNum=parseInt(index)
@@ -231,7 +253,7 @@ const etf=()=>{
                 mainInputHistory.shift();
             }
             if(btns.length){
-                fightoutput.innerHTML=mainInputHistory.filter((e)=>e!=='').join('_');
+                fightoutput.innerHTML=mainHisStr;//mainInputHistory.filter((e)=>e!=='').join('_');
                 let result=fightingInputMulti(Commands,mainInputHistory)
                 let work=false;
                 for(let key in result){

@@ -1,148 +1,148 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        html{
-            background-color: #000;
-            color: white;
-        }
-        td{
-            border:1px solid grey;
-            padding: 2px 5px;
-        }
-        #output table{
-            float:left;
-        }
-    </style>
-</head>
-<body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			html {
+				background-color: #000;
+				color: white;
+			}
+			td {
+				border: 1px solid grey;
+				padding: 2px 5px;
+			}
+			#output table {
+				float: left;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 id="f"></h1>
+		<div id="output"></div>
 
-    <h1 id="f"></h1>
-    <div id="output"></div>
+		<script>
+			let kbi;
+		</script>
+		<script type="module">
+			import { GamepadMaster, ControlType } from "../dist/controlwrap.esm.js";
 
-    <script>
-        let kbi
-    </script>
-    <script type="module">
-        import {GamepadMaster,ControlType} from "../dist/controlwrap.esm.js";
+			const output_f = document.getElementById("f");
+			const output = document.getElementById("output");
 
-        const output_f=document.getElementById("f");
-        const output=document.getElementById("output");
+			kbi = GamepadMaster.getInstance();
+			kbi.init();
+			kbi.importRequirement({
+				type: ControlType.GAMEPAD,
+				direction: {
+					dpad: false,
+					analog: 0,
+				},
+				button: ["attack", "jump", "defend", "special"],
+				optional: ["double", "command"],
 
+				ui_optional: ["prevTab", "nextTab", "info"],
+				ui_pair: {
+					confirm: "attack",
+					cancel: "jump",
+				},
+			});
+			kbi.setDefaultMapping({
+				attack: "x",
+				jump: "a",
+				defend: ["b", "rightshoulder"],
+				special: "y",
 
-        kbi=GamepadMaster.getInstance()
-        kbi.init();
-        kbi.importRequirement({
-            type:ControlType.GAMEPAD,
-            direction:{
-                dpad:false,
-                analog:0
-            },
-            button:['attack','jump','defend','special'],
-            optional:['double','command'],
-            
-            ui_optional:['prevTab','nextTab','info'],
-            ui_pair:{
-                'confirm':'attack',
-                'cancel':'jump'
-            }
-            
-        })
-        kbi.setDefaultMapping({
+				//optional
+				double: "leftshoulder",
+				command: "righttrigger",
 
-            'attack':'x',
-            'jump':'a',
-            'defend':['b','rightshoulder'],
-            'special':'y',
-
-            //optional
-            'double':'leftshoulder',
-            'command':'righttrigger',
-
-            /*
+				/*
             ui button no need to assign in gamepad
             //ui
             'info':'back',
             'prevTab':'leftshoulder',
             'nextTab':'rightshoulder',
             */
-        })
+			});
 
-        console.log(kbi.getMappableKeys(0))
-        console.log(kbi.getAllMapping(0))
-        console.log(kbi.getAllMapping(1))
+			console.log(kbi.getMappableKeys(0));
+			console.log(kbi.getAllMapping(0));
+			console.log(kbi.getAllMapping(1));
 
+			let f = 0;
 
-        let f=0;
-        
-        const dict2Table=(dict)=>{
-            let h=`<table>`
-                for(let key in dict){
-                    if(dict[key] && dict[key].constructor == Object){
-                        h+=`<tr>
+			const dict2Table = (dict) => {
+				let h = `<table>`;
+				for (let key in dict) {
+					if (dict[key] && dict[key].constructor == Object) {
+						h += `<tr>
                             <td>${key}</td>
                             <td>${dict2Table(dict[key])}</td>
-                            </tr>`
-                    }else{
-
-                        h+=`<tr>
+                            </tr>`;
+					} else {
+						h += `<tr>
                             <td>${key}</td>
                             <td>${JSON.stringify(dict[key])}</td>
                             </tr>
-                            `
-                    }
-                }
-                h+=`</table>`
-            return h;
-        }
-        let lastH='';
-        const etf=()=>{
-            let h='';
+                            `;
+					}
+				}
+				h += `</table>`;
+				return h;
+			};
+			let lastH = "";
+			const etf = () => {
+				let h = "";
 
-            const all=kbi.flushAll();
-            //console.log(all)
-            for(let index in all){
-                const indexNum=parseInt(index)
-                const input=all[indexNum]
-                h+=dict2Table(input)
-            }
+				const all = kbi.flushAll();
+				//console.log(all)
+				for (let index in all) {
+					const indexNum = parseInt(index);
+					const input = all[indexNum];
+					h += dict2Table(input);
+				}
 
-            if(lastH!=h){
-                output.innerHTML=h
-                lastH=h;
-            }
-            //output_f.innerHTML=++f
-        }
+				if (lastH != h) {
+					output.innerHTML = h;
+					lastH = h;
+				}
+				//output_f.innerHTML=++f
+			};
 
-    setInterval(etf,1000/60);
-        let listner
-        addEventListener("keydown",async(e)=>{
-            if(e.code==='Backquote'){
-                etf();
-            }
-            if(e.code==='Digit1'){
-                listner=kbi.listenController(['confirm']).then((listner)=>{
-                    console.log('listenController done',listner)
-                }).catch(function(error) {
-                    console.log('catch',error)
-                })
-                console.log('listner',listner)
-            }
-            if(e.code==='Digit2' && listner){
-                kbi.cancelListen()
-            }
-            if(e.code==='Digit3'){
-                listner=kbi.listenAnyKey().then((listner)=>{
-                    console.log('listenAnyKey done',listner)
-                }).catch(function(error) {
-                    console.log('catch',error)
-                })
-                console.log('listner',listner)
-            }
-        })
-    </script>
-</body>
+			setInterval(etf, 1000 / 60);
+			let listner;
+			addEventListener("keydown", async (e) => {
+				if (e.code === "Backquote") {
+					etf();
+				}
+				if (e.code === "Digit1") {
+					listner = kbi
+						.listenController(["confirm"])
+						.then((listner) => {
+							console.log("listenController done", listner);
+						})
+						.catch(function (error) {
+							console.log("catch", error);
+						});
+					console.log("listner", listner);
+				}
+				if (e.code === "Digit2" && listner) {
+					kbi.cancelListen();
+				}
+				if (e.code === "Digit3") {
+					listner = kbi
+						.listenAnyKey()
+						.then((listner) => {
+							console.log("listenAnyKey done", listner);
+						})
+						.catch(function (error) {
+							console.log("catch", error);
+						});
+					console.log("listner", listner);
+				}
+			});
+		</script>
+	</body>
 </html>

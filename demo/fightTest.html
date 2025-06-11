@@ -1,385 +1,403 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        html{
-            background-color: #000;
-            color: white;
-        }
-        td{
-            border:1px solid grey;
-            padding: 2px 5px;
-        }
-        #output table{
-            float:left;
-        }
-    </style>
-</head>
-<body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			html {
+				background-color: #000;
+				color: white;
+			}
+			td {
+				border: 1px solid grey;
+				padding: 2px 5px;
+			}
+			#output table {
+				float: left;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 id="f"></h1>
+		<button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button
+		><br /><br />
+		<hr />
+		(open console to see the result) <br />
+		index:<input type="number" id="ip_index" value="100" /> <br />
+		<button id="btn_listen_controller">listen which key press on input id</button><br />
+		<button id="btn_map_all">btn_map_all</button><br />
+		<button id="btn_reset_Default">btn_reset_Default</button><br />
+		<!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
 
-    <h1 id="f"></h1>
-    <button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button><br/><br/>
-    <hr/>
-    (open console to see the result) <br/>
-    index:<input type="number" id="ip_index" value=100 > <br/>
-    <button id="btn_listen_controller">listen which key press on input id</button><br/>
-    <button id="btn_map_all">btn_map_all</button><br/>
-    <button id="btn_reset_Default">btn_reset_Default</button><br/>
-    <!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
-    
-    <hr>
-    <div id="fightoutput"></div>
-    <div id="output"></div>
+		<hr />
+		<div id="fightoutput"></div>
+		<div id="output"></div>
 
-    <script>
-        let cwi,gmi
-    </script>
-    <script type="module">
-        
-import {ControlWrap,GamepadMaster,ControlType,gamepad_standardizer,fightingInput,str2Command,fightingInputMulti,pressHistory} from "../dist/controlwrap.esm.js";
+		<script>
+			let cwi, gmi;
+		</script>
+		<script type="module">
+			import {
+				ControlWrap,
+				GamepadMaster,
+				ControlType,
+				gamepad_standardizer,
+				fightingInput,
+				str2Command,
+				fightingInputMulti,
+				pressHistory,
+			} from "../dist/controlwrap.esm.js";
 
+			const output_f = document.getElementById("f");
+			const output = document.getElementById("output");
+			const fightoutput = document.getElementById("fightoutput");
 
-const output_f=document.getElementById("f");
-const output=document.getElementById("output");
-const fightoutput=document.getElementById("fightoutput");
+			gmi = GamepadMaster.getInstance();
+			cwi = ControlWrap.getInstance();
 
-gmi=GamepadMaster.getInstance()
-cwi=ControlWrap.getInstance()
+			cwi.wrappedInit(
+				{
+					direction: {
+						dpad: true,
+						analog: 2,
+					},
+					button: ["attack", "jump", "defend", "special"],
+					optional: ["double", "command"],
+					ui_optional: ["prevTab", "nextTab", "info"],
+					ui_pair: {
+						confirm: "attack",
+						cancel: "jump",
+					},
+				},
+				{
+					attack: "x",
+					jump: "a",
+					defend: "b",
+					special: "y",
 
-cwi.wrappedInit({
-    direction:{
-        dpad:true,
-        analog:2
-    },
-    button:['attack','jump','defend','special'],
-    optional:['double','command'],
-    ui_optional:['prevTab','nextTab','info'],
-    ui_pair:{
-        'confirm':'attack',
-        'cancel':'jump'
-    }
-},{
+					//optional
+					double: "leftshoulder",
+					command: "rightshoulder",
 
-    'attack':'x',
-    'jump':'a',
-    'defend':'b',
-    'special':'y',
-
-    //optional
-    'double':'leftshoulder',
-    'command':'rightshoulder',
-
-    /*
+					/*
     ui button no need to assign in gamepad
     //ui
     'info':'back',
     'prevTab':'leftshoulder',
     'nextTab':'rightshoulder',
     */
-},[{
-    'up':'KeyW',
-    'down':'KeyS',
-    'left':'KeyA',
-    'right':'KeyD',
+				},
+				[
+					{
+						up: "KeyW",
+						down: "KeyS",
+						left: "KeyA",
+						right: "KeyD",
 
-    'attack':'KeyF',
-    'jump':'KeyG',
-    'defend':['KeyH','KeyB'],
-    'special':'KeyR',
+						attack: "KeyF",
+						jump: "KeyG",
+						defend: ["KeyH", "KeyB"],
+						special: "KeyR",
 
-    'double':'ShiftLeft',
-    'info':'Tab',
-    'command':'KeyQ',
-    'prevTab':'KeyQ',
-    'nextTab':'KeyE',
-},{
-    'up':'KeyI',
-    'down':'KeyK',
-    'left':'KeyJ',
-    'right':'KeyL',
+						double: "ShiftLeft",
+						info: "Tab",
+						command: "KeyQ",
+						prevTab: "KeyQ",
+						nextTab: "KeyE",
+					},
+					{
+						up: "KeyI",
+						down: "KeyK",
+						left: "KeyJ",
+						right: "KeyL",
 
-    'attack':'KeyP',
-    'jump':'BracketLeft',
-    'defend':'BracketRight',
-    'special':'Semicolon'
-}
-],
-2,false
-);
+						attack: "KeyP",
+						jump: "BracketLeft",
+						defend: "BracketRight",
+						special: "Semicolon",
+					},
+				],
+				2,
+				false,
+			);
 
-/*
+			/*
 console.log(cwi.getMappableKeys(0))
 console.log(cwi.getMappableKeys(2))
 console.log(cwi.getAllMapping(0))
 console.log(cwi.getAllMapping(1))
 */
 
-cwi.setAllMapping(2,{
-    'up':'Numpad8',
-    'down':'Numpad2',
-    'left':'Numpad4',
-    'right':'Numpad6',
-    'attack':'Numpad5',
-    'jump':'Numpad1',
-    'defend':'Numpad3',
-    'special':'Numpad0'
-})
+			cwi.setAllMapping(2, {
+				up: "Numpad8",
+				down: "Numpad2",
+				left: "Numpad4",
+				right: "Numpad6",
+				attack: "Numpad5",
+				jump: "Numpad1",
+				defend: "Numpad3",
+				special: "Numpad0",
+			});
 
-
-let f=0;
-let mainInputHistory=[];
-const dict2Table=(dict)=>{
-    let h=`<table>`
-        for(let key in dict){
-            if(dict[key] && dict[key].constructor == Object){
-                h+=`<tr>
+			let f = 0;
+			let mainInputHistory = [];
+			const dict2Table = (dict) => {
+				let h = `<table>`;
+				for (let key in dict) {
+					if (dict[key] && dict[key].constructor == Object) {
+						h += `<tr>
                     <td>${key}</td>
                     <td>${dict2Table(dict[key])}</td>
-                    </tr>`
-            }else{
-
-                h+=`<tr>
+                    </tr>`;
+					} else {
+						h += `<tr>
                     <td>${key}</td>
                     <td>${JSON.stringify(dict[key])}</td>
                     </tr>
-                    `
-            }
-        }
-        h+=`</table>`
-    return h;
-}
-let lastH='';
-let framePassed=0;
-let lastDir=5
+                    `;
+					}
+				}
+				h += `</table>`;
+				return h;
+			};
+			let lastH = "";
+			let framePassed = 0;
+			let lastDir = 5;
 
-const Commands={
-    623:str2Command('623attack'),
-    //613:str2Command('613attack'),
-    236:str2Command('26attack'),
-    //16:str2Command('16attack'),
-    63214:str2Command('624attack'),
-    '6a':str2Command('6attack'),
+			const Commands = {
+				623: str2Command("623attack"),
+				//613:str2Command('613attack'),
+				236: str2Command("26attack"),
+				//16:str2Command('16attack'),
+				63214: str2Command("624attack"),
+				"6a": str2Command("6attack"),
 
+				"236k": str2Command("236jump/defend"),
+				"super ball": str2Command("6426jump+defend"),
+				super1: str2Command("2426attack"),
+				"super  max": str2Command("2426attack+jump"),
+				super2: str2Command("2626attack"),
 
-    '236k':str2Command('236jump/defend'),
-    'super ball':str2Command('6426jump+defend'),
-    'super1':str2Command('2426attack'),
-    'super  max':str2Command('2426attack+jump'),
-    'super2':str2Command('2626attack'),
+				22: str2Command("252attack"),
 
-    '22':str2Command('252attack'),
-
-
-    /*
+				/*
     236:str2Command('26attack'),
     214:str2Command('26attack',true),
     236236:str2Command('26attack',false,2),
     iori:str2Command('26attack',false,4)
     */
-}
+			};
 
-let frame=0;
+			let frame = 0;
 
-const etf=()=>{
-    let h='';
-    frame++;
-    const all=cwi.update();
+			const etf = () => {
+				let h = "";
+				frame++;
+				const all = cwi.update();
 
-    h+=`<h1>Main player id:${cwi.mainControllerIndex}</h1>`
+				h += `<h1>Main player id:${cwi.mainControllerIndex}</h1>`;
 
-    pressHistory.getInstance().addHistory(all.player)
+				pressHistory.getInstance().addHistory(all.player);
 
-//console.log(pressHistory.getInstance().getShorten(cwi.mainControllerIndex))
-const mainHisStr=pressHistory.getInstance().getShorten(cwi.mainControllerIndex)
+				//console.log(pressHistory.getInstance().getShorten(cwi.mainControllerIndex))
+				const mainHisStr = pressHistory.getInstance().getShorten(cwi.mainControllerIndex);
 
-const dou=pressHistory.getInstance().doublePressDirection(cwi.mainControllerIndex,20)
-if(dou){
-    console.log('double press',dou)
-    pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex)
-}
+				const dou = pressHistory.getInstance().doublePressDirection(cwi.mainControllerIndex, 20);
+				if (dou) {
+					console.log("double press", dou);
+					pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex);
+				}
 
-if(all.player[100] && all.player[100].button.attack.just && all.player[100].button.attack.press){
-    console.log('just attack',frame)
-}
+				if (all.player[100] && all.player[100].button.attack.just && all.player[100].button.attack.press) {
+					console.log("just attack", frame);
+				}
 
-const dou2=pressHistory.getInstance().doublePress(cwi.mainControllerIndex,'attack',20)
-if(dou2){
-    console.log('double attack')
-    pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex)
-}
-    
-    for(let index in all.player){
-        const indexNum=parseInt(index)
-        const input=all.player[indexNum]
-        const extra={}
-        extra['type']='player';
-        extra['index']=indexNum;
-        extra['name']=cwi.getName(indexNum);
-        
-        const mapping=cwi.getAllMapping(indexNum)
+				const dou2 = pressHistory.getInstance().doublePress(cwi.mainControllerIndex, "attack", 20);
+				if (dou2) {
+					console.log("double attack");
+					pressHistory.getInstance().cleanPlayer(cwi.mainControllerIndex);
+				}
 
-        h+=dict2Table({
-            type:'player',
-            index:indexNum,
-            name:cwi.getName(indexNum),
-            ...input,
-            mapping
-        })
+				for (let index in all.player) {
+					const indexNum = parseInt(index);
+					const input = all.player[indexNum];
+					const extra = {};
+					extra["type"] = "player";
+					extra["index"] = indexNum;
+					extra["name"] = cwi.getName(indexNum);
 
-        //
-        if(indexNum===cwi.mainControllerIndex){
-            let btns=[];
-            for(let key in input.directionButton){
-                if(input.directionButton[key].just && input.directionButton[key].press){
-                    break;
-                }
-            }
-            //if(input.mixedDpad.numpad!=lastDir){
-                if(input.mixedDpad.numpad!=5){
-                    btns.push(input.mixedDpad.numpad)
-                }
-                //lastDir=input.mixedDpad.numpad;
-            //}
-            for(let key in input.button){
-                if(input.button[key].just && input.button[key].press){
-                    btns.push(key)
-                }
-            }
-            mainInputHistory.push(btns.join(','))
-            if(mainInputHistory.length>80){
-                mainInputHistory.shift();
-            }
-            if(btns.length){
-                fightoutput.innerHTML=mainHisStr;//mainInputHistory.filter((e)=>e!=='').join('_');
-                let result=fightingInputMulti(Commands,mainInputHistory)
-                let work=false;
-                for(let key in result){
-                    if(result[key]){
-                        console.log(key,result[key])
-                        work=true;
-                    }
-                }
-                if(work){
-                    console.log(fightoutput.innerHTML)
-                    mainInputHistory=[];
-                }else if(btns.length>1){
-                    console.log(fightoutput.innerHTML)
-                }
-            }
-        }
-    }
-    
-    if(all.mouse){
-        h+=dict2Table({
-            type:'mouse',
-            ...all.mouse})
-    }
+					const mapping = cwi.getAllMapping(indexNum);
 
-    h+=dict2Table({
-        type:'system keyboard',
-        ...all.system})
-    
-    h+=dict2Table({
-        type:'ui mixed',
-        ...all.ui})
+					h += dict2Table({
+						type: "player",
+						index: indexNum,
+						name: cwi.getName(indexNum),
+						...input,
+						mapping,
+					});
 
-    if(all.ui.ui_tap.length!=0){
-        //console.log('framePassed',framePassed,all.ui.ui_tap)
-    }
-    
+					//
+					if (indexNum === cwi.mainControllerIndex) {
+						let btns = [];
+						for (let key in input.directionButton) {
+							if (input.directionButton[key].just && input.directionButton[key].press) {
+								break;
+							}
+						}
+						//if(input.mixedDpad.numpad!=lastDir){
+						if (input.mixedDpad.numpad != 5) {
+							btns.push(input.mixedDpad.numpad);
+						}
+						//lastDir=input.mixedDpad.numpad;
+						//}
+						for (let key in input.button) {
+							if (input.button[key].just && input.button[key].press) {
+								btns.push(key);
+							}
+						}
+						mainInputHistory.push(btns.join(","));
+						if (mainInputHistory.length > 80) {
+							mainInputHistory.shift();
+						}
+						if (btns.length) {
+							fightoutput.innerHTML = mainHisStr; //mainInputHistory.filter((e)=>e!=='').join('_');
+							let result = fightingInputMulti(Commands, mainInputHistory);
+							let work = false;
+							for (let key in result) {
+								if (result[key]) {
+									console.log(key, result[key]);
+									work = true;
+								}
+							}
+							if (work) {
+								console.log(fightoutput.innerHTML);
+								mainInputHistory = [];
+							} else if (btns.length > 1) {
+								console.log(fightoutput.innerHTML);
+							}
+						}
+					}
+				}
 
-    if(lastH!=h){
-        output.innerHTML=h
-        lastH=h;
-    }
-    //output_f.innerHTML=++f
-    framePassed++;
-    requestAnimationFrame(etf)
-}
-//setInterval(etf,1000/60);
-requestAnimationFrame(etf)
+				if (all.mouse) {
+					h += dict2Table({
+						type: "mouse",
+						...all.mouse,
+					});
+				}
 
-document.getElementById("btn_listen_controller").addEventListener('click',()=>{
-    const index=parseInt(document.getElementById("ip_index").value)
-    console.log(index)
-    
-    cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
-        console.log('key_name',key_name)
-    }).catch(function(error) {
-        console.log('catch',error)
-    })
-})
+				h += dict2Table({
+					type: "system keyboard",
+					...all.system,
+				});
 
-//cwi.allowMainPlayerUseAllController=true;
-const listen_attack=()=>{
-    cwi.listenControllerIndexFromKeys(['attack','start','cancel']).then((controller_index)=>{
-        console.log('controller_index',controller_index)
-        cwi.mainControllerIndex=controller_index;
-    }).catch(function(error) {
-        console.log('catch',error)
-    })
-}
-document.getElementById("btn_listen_attack").addEventListener('click',listen_attack)
-setTimeout(listen_attack,1000)
+				h += dict2Table({
+					type: "ui mixed",
+					...all.ui,
+				});
 
-const mapAllInConsole=async(index)=>{
+				if (all.ui.ui_tap.length != 0) {
+					//console.log('framePassed',framePassed,all.ui.ui_tap)
+				}
 
-    const [cType,]=cwi.parseIndex(index);
-    const buttonNames=cwi.getMappableKeys(index);
+				if (lastH != h) {
+					output.innerHTML = h;
+					lastH = h;
+				}
+				//output_f.innerHTML=++f
+				framePassed++;
+				requestAnimationFrame(etf);
+			};
+			//setInterval(etf,1000/60);
+			requestAnimationFrame(etf);
 
-    const newMapping={}
-    let breakFlag=false;
-    for(let btnName of buttonNames.buttons){
-        console.info('please press',btnName)
-        await cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
-            console.log('mapped',btnName,key_name)
-            newMapping[btnName]=key_name
-        }).catch(function(error) {
-            breakFlag=true
-            //console.log('catch',error);
-        })
-        if(breakFlag){
-            console.log('mapping cancel')
-            return Promise.reject('mapping cancel');
-        }
-    }
-    for(let btnName of buttonNames.optional){
-        console.info('please press',btnName,'(press start or escape to skip)')
-        await cwi.listenKeyFromControllerIndex(index).then((key_name)=>{
-            console.log('key_name',key_name)
-            newMapping[btnName]=key_name
-        }).catch(function(error) {
-            console.info('skiped ',btnName)
-        })
-    }
-    console.info('finish mapping:',newMapping)
-    return newMapping;
-}
+			document.getElementById("btn_listen_controller").addEventListener("click", () => {
+				const index = parseInt(document.getElementById("ip_index").value);
+				console.log(index);
 
-document.getElementById("btn_map_all").addEventListener('click',()=>{
-    const index=parseInt(document.getElementById("ip_index").value)
+				cwi.listenKeyFromControllerIndex(index)
+					.then((key_name) => {
+						console.log("key_name", key_name);
+					})
+					.catch(function (error) {
+						console.log("catch", error);
+					});
+			});
 
-    const oldMapping=cwi.getAllMapping(index);
+			//cwi.allowMainPlayerUseAllController=true;
+			const listen_attack = () => {
+				cwi.listenControllerIndexFromKeys(["attack", "start", "cancel"])
+					.then((controller_index) => {
+						console.log("controller_index", controller_index);
+						cwi.mainControllerIndex = controller_index;
+					})
+					.catch(function (error) {
+						console.log("catch", error);
+					});
+			};
+			document.getElementById("btn_listen_attack").addEventListener("click", listen_attack);
+			setTimeout(listen_attack, 1000);
 
-    mapAllInConsole(index).then((newMapping)=>{
-        cwi.setAllMapping(index,newMapping)
-    }).catch(function(error) {
-        console.log('catch cancel',error)
-    })
-    
-})
+			const mapAllInConsole = async (index) => {
+				const [cType] = cwi.parseIndex(index);
+				const buttonNames = cwi.getMappableKeys(index);
 
+				const newMapping = {};
+				let breakFlag = false;
+				for (let btnName of buttonNames.buttons) {
+					console.info("please press", btnName);
+					await cwi
+						.listenKeyFromControllerIndex(index)
+						.then((key_name) => {
+							console.log("mapped", btnName, key_name);
+							newMapping[btnName] = key_name;
+						})
+						.catch(function (error) {
+							breakFlag = true;
+							//console.log('catch',error);
+						});
+					if (breakFlag) {
+						console.log("mapping cancel");
+						return Promise.reject("mapping cancel");
+					}
+				}
+				for (let btnName of buttonNames.optional) {
+					console.info("please press", btnName, "(press start or escape to skip)");
+					await cwi
+						.listenKeyFromControllerIndex(index)
+						.then((key_name) => {
+							console.log("key_name", key_name);
+							newMapping[btnName] = key_name;
+						})
+						.catch(function (error) {
+							console.info("skiped ", btnName);
+						});
+				}
+				console.info("finish mapping:", newMapping);
+				return newMapping;
+			};
 
-document.getElementById("btn_reset_Default").addEventListener('click',async()=>{
-    const index=parseInt(document.getElementById("ip_index").value)
-    cwi.resetDefault(index)
+			document.getElementById("btn_map_all").addEventListener("click", () => {
+				const index = parseInt(document.getElementById("ip_index").value);
 
-})
+				const oldMapping = cwi.getAllMapping(index);
 
-/*
+				mapAllInConsole(index)
+					.then((newMapping) => {
+						cwi.setAllMapping(index, newMapping);
+					})
+					.catch(function (error) {
+						console.log("catch cancel", error);
+					});
+			});
+
+			document.getElementById("btn_reset_Default").addEventListener("click", async () => {
+				const index = parseInt(document.getElementById("ip_index").value);
+				cwi.resetDefault(index);
+			});
+
+			/*
 //TODO : mapping with long press bug, should be jump to next step mapping when the button released
 const mappingRaw=async(index,analog=2)=>{
     if(analog>2){
@@ -605,6 +623,6 @@ document.getElementById("map_raw_btn").addEventListener('click',async()=>{
 
 })
 */
-   </script>
-</body>
+		</script>
+	</body>
 </html>

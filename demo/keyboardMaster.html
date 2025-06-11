@@ -1,165 +1,164 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        html{
-            background-color: #000;
-            color: white;
-        }
-        td{
-            border:1px solid grey;
-            padding: 2px 5px;
-        }
-        #output table{
-            float:left;
-        }
-    </style>
-</head>
-<body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Document</title>
+		<style>
+			html {
+				background-color: #000;
+				color: white;
+			}
+			td {
+				border: 1px solid grey;
+				padding: 2px 5px;
+			}
+			#output table {
+				float: left;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 id="f"></h1>
 
-    <h1 id="f"></h1>
+		<div id="output"></div>
 
-    
+		<script>
+			let kbi;
+		</script>
+		<script type="module">
+			import { KeyboardMaster, ControlType } from "../dist/controlwrap.esm.js";
 
-    <div id="output"></div>
+			const output_f = document.getElementById("f");
+			const output = document.getElementById("output");
+			const output_tb = document.getElementById("output_tb");
 
-    <script>
-        let kbi
-    </script>
-    <script type="module">
-        import {KeyboardMaster,ControlType} from "../dist/controlwrap.esm.js";
+			kbi = KeyboardMaster.getInstance();
+			kbi.init();
+			kbi.importRequirement({
+				direction: {
+					dpad: true,
+					analog: 0,
+				},
+				button: ["attack", "jump", "defend", "special"],
+				optional: ["double", "command"],
+				ui_optional: ["prevTab", "nextTab", "info"],
+				ui_pair: {
+					confirm: "attack",
+					cancel: "jump",
+				},
+			});
+			kbi.setDefaultKeyboardMapping(0, {
+				up: "KeyW",
+				down: "KeyS",
+				left: "KeyA",
+				right: "KeyD",
 
-        const output_f=document.getElementById("f");
-        const output=document.getElementById("output");
-        const output_tb=document.getElementById("output_tb");
+				attack: "KeyF",
+				jump: "KeyG",
+				defend: ["KeyH", "KeyB"],
+				special: "KeyR",
 
+				double: "ShiftLeft",
+				info: "Tab",
+				command: "KeyQ",
+				prevTab: "KeyQ",
+				nextTab: "KeyE",
+			});
+			kbi.setDefaultKeyboardMapping(1, {
+				up: "KeyI",
+				down: "KeyK",
+				left: "KeyJ",
+				right: "KeyL",
 
-        kbi=KeyboardMaster.getInstance()
-        kbi.init();
-        kbi.importRequirement({
-            direction:{
-                dpad:true,
-                analog:0
-            },
-            button:['attack','jump','defend','special'],
-            optional:['double','command'],
-            ui_optional:['prevTab','nextTab','info'],
-            ui_pair:{
-                'confirm':'attack',
-                'cancel':'jump'
-            }
-        })
-        kbi.setDefaultKeyboardMapping(0,{
+				attack: "KeyP",
+				jump: "BracketLeft",
+				defend: "BracketRight",
+				special: "Semicolon",
+			});
+			kbi.setPlayerCountFromKeyboard(2);
 
-            'up':'KeyW',
-            'down':'KeyS',
-            'left':'KeyA',
-            'right':'KeyD',
+			console.log(kbi.getMappableKeys(0));
+			console.log(kbi.getAllMapping(0));
+			console.log(kbi.getAllMapping(1));
 
-            'attack':'KeyF',
-            'jump':'KeyG',
-            'defend':['KeyH','KeyB'],
-            'special':'KeyR',
+			let f = 0;
 
-            'double':'ShiftLeft',
-            'info':'Tab',
-            'command':'KeyQ',
-            'prevTab':'KeyQ',
-            'nextTab':'KeyE',
-        })
-        kbi.setDefaultKeyboardMapping(1,{
-            'up':'KeyI',
-            'down':'KeyK',
-            'left':'KeyJ',
-            'right':'KeyL',
-
-            'attack':'KeyP',
-            'jump':'BracketLeft',
-            'defend':'BracketRight',
-            'special':'Semicolon'
-        })
-        kbi.setPlayerCountFromKeyboard(2);
-
-        console.log(kbi.getMappableKeys(0))
-        console.log(kbi.getAllMapping(0))
-        console.log(kbi.getAllMapping(1))
-
-
-        let f=0;
-        
-        const dict2Table=(dict)=>{
-            let h=`<table>`
-                for(let key in dict){
-                    if(dict[key].constructor == Object){
-                        h+=`<tr>
+			const dict2Table = (dict) => {
+				let h = `<table>`;
+				for (let key in dict) {
+					if (dict[key].constructor == Object) {
+						h += `<tr>
                             <td>${key}</td>
                             <td>${dict2Table(dict[key])}</td>
-                            </tr>`
-                    }else{
-
-                        h+=`<tr>
+                            </tr>`;
+					} else {
+						h += `<tr>
                             <td>${key}</td>
                             <td>${JSON.stringify(dict[key])}</td>
                             </tr>
-                            `
-                    }
-                }
-                h+=`</table>`
-            return h;
-        }
-        let lastH='';
-        let framePassed=0;
-        const etf=()=>{
-            let h='';
+                            `;
+					}
+				}
+				h += `</table>`;
+				return h;
+			};
+			let lastH = "";
+			let framePassed = 0;
+			const etf = () => {
+				let h = "";
 
-            const all=KeyboardMaster.getInstance().flushAll();
-            //console.log(all)
-            for(let index in all){
-                const indexNum=parseInt(index)
-                const input=all[indexNum]
-                h+=dict2Table(input)
-            }
-            if(all[1000].ui_tap.length!=0){
-                console.log('framePassed',framePassed,all[1000].ui_tap)
-            }
-            framePassed++
+				const all = KeyboardMaster.getInstance().flushAll();
+				//console.log(all)
+				for (let index in all) {
+					const indexNum = parseInt(index);
+					const input = all[indexNum];
+					h += dict2Table(input);
+				}
+				if (all[1000].ui_tap.length != 0) {
+					console.log("framePassed", framePassed, all[1000].ui_tap);
+				}
+				framePassed++;
 
-            if(lastH!=h){
-                output.innerHTML=h
-                lastH=h;
-            }
-            //output_f.innerHTML=++f
-        }
+				if (lastH != h) {
+					output.innerHTML = h;
+					lastH = h;
+				}
+				//output_f.innerHTML=++f
+			};
 
-    setInterval(etf,1000/60);
-        let listner
-        addEventListener("keydown",async(e)=>{
-            if(e.code==='Backquote'){
-                etf();
-            }
-            if(e.code==='Digit1'){
-                listner=kbi.listenController(['confirm']).then((listner)=>{
-                    console.log('listenController done',listner)
-                }).catch(function(error) {
-                    console.log('catch',error)
-                })
-                console.log('listner',listner)
-            }
-            if(e.code==='Digit2' && listner){
-                kbi.cancelListen()
-            }
-            if(e.code==='Digit3'){
-                listner=kbi.listenAnyKey().then((listner)=>{
-                    console.log('listenAnyKey done',listner)
-                }).catch(function(error) {
-                    console.log('catch',error)
-                })
-                console.log('listner',listner)
-            }
-        })
-    </script>
-</body>
+			setInterval(etf, 1000 / 60);
+			let listner;
+			addEventListener("keydown", async (e) => {
+				if (e.code === "Backquote") {
+					etf();
+				}
+				if (e.code === "Digit1") {
+					listner = kbi
+						.listenController(["confirm"])
+						.then((listner) => {
+							console.log("listenController done", listner);
+						})
+						.catch(function (error) {
+							console.log("catch", error);
+						});
+					console.log("listner", listner);
+				}
+				if (e.code === "Digit2" && listner) {
+					kbi.cancelListen();
+				}
+				if (e.code === "Digit3") {
+					listner = kbi
+						.listenAnyKey()
+						.then((listner) => {
+							console.log("listenAnyKey done", listner);
+						})
+						.catch(function (error) {
+							console.log("catch", error);
+						});
+					console.log("listner", listner);
+				}
+			});
+		</script>
+	</body>
 </html>

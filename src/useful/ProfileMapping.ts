@@ -1,17 +1,11 @@
-import { ControllerProfile,mappingRequirement,ControlType,ControllerInfo } from '../types';
+import { ControllerProfile, mappingRequirement, ControlType, ControllerInfo } from "../types";
 
 export class ProfileMapping {
+	constructor() {}
 
-    constructor() {
-        
-    }
+	addCustomProfile(name: string, info: ControllerInfo, mapping: Record<string, string | string[]>) {
+		info.name;
+	}
 
-    addCustomProfile(name:string,info:ControllerInfo,mapping:Record<string,string|string[]>) {
-        
-        info.name
-    }
-
-    removeCustomProfile(profile:ControllerProfile) {
-        
-    }
+	removeCustomProfile(profile: ControllerProfile) {}
 }

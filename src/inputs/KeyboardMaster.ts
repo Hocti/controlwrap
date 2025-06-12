@@ -1,4 +1,3 @@
-import { EventEmitter } from "eventemitter3";
 
 import { dpad, dpadPress, getDpadDirection, xy } from "gamepad_standardizer";
 import {
@@ -14,7 +13,7 @@ import { inEnum, findKeyByValue, stopEvent, clone } from "../utils/utils";
 import { Button, getUITap, joinState, isRepeat } from "./Button";
 import InputDeviceMaster, { listenStatus } from "./InputDeviceMaster";
 import { IControllerMaster } from "./IControllerMaster";
-import { SYSTEM_INDEX_OFFSET, KEYBOARD_HARDCODE_UI_BUTTON, buttonLayout } from "../config";
+import { SYSTEM_INDEX_OFFSET, KEYBOARD_HARDCODE_UI_BUTTON, KEYBOARD_HARDCODE_UI_BUTTON_STRUCT, buttonLayout } from "../config";
 
 const MAX_KEYBOARD = 4;
 const F_ALL: string[] = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
@@ -65,6 +64,8 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
     private buttons: Record<string, Button> = {};
     private inited: boolean = false;
+
+    public allowNonStructedSystemKey: Boolean = false;
 
     public get downKeys() {
         return Array.from(this.downKey);
@@ -304,8 +305,14 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
     protected getSystemInput(keyStatus: Record<string, ButtonState>): Input {
         const sdf: Record<string, ButtonState> = {};
-        for (let keyName in KEYBOARD_HARDCODE_UI_BUTTON) {
-            sdf[keyName] = keyStatus[KEYBOARD_HARDCODE_UI_BUTTON[keyName]];
+        if (this.allowNonStructedSystemKey) {
+            for (let keyName in KEYBOARD_HARDCODE_UI_BUTTON_STRUCT) {
+                sdf[keyName] = keyStatus[KEYBOARD_HARDCODE_UI_BUTTON_STRUCT[keyName]];
+            }
+        } else {
+            for (let keyName in KEYBOARD_HARDCODE_UI_BUTTON) {
+                sdf[keyName] = keyStatus[KEYBOARD_HARDCODE_UI_BUTTON[keyName]];
+            }
         }
         const ui_tap: string[] = [];
         const ui_pressing: string[] = [];
@@ -485,12 +492,20 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         if (ignoreKeys.indexOf(keyCode) !== -1) return false;
         if (buttonName === "escape") return false;
 
-        if (
-            //inEnum(buttonName,UIButton) &&
-            Object.values(KEYBOARD_HARDCODE_UI_BUTTON).indexOf(keyCode) != -1 &&
-            (KEYBOARD_HARDCODE_UI_BUTTON[buttonName] !== keyCode || id != 0)
-        ) {
-            return false;
+        if (this.allowNonStructedSystemKey) {
+            if (
+                Object.values(KEYBOARD_HARDCODE_UI_BUTTON_STRUCT).includes(keyCode) &&
+                (KEYBOARD_HARDCODE_UI_BUTTON_STRUCT[buttonName] !== keyCode || id != 0)
+            ) {
+                return false;
+            }
+        } else {
+            if (
+                Object.values(KEYBOARD_HARDCODE_UI_BUTTON).includes(keyCode) &&
+                (KEYBOARD_HARDCODE_UI_BUTTON[buttonName] !== keyCode || id != 0)
+            ) {
+                return false;
+            }
         }
 
         return true;

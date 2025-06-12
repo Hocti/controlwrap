@@ -11,25 +11,14 @@ import KeyboardMaster from "./inputs/KeyboardMaster";
 import PlayerIndexMapper from "./useful/PlayerIndexMapper";
 
 export {
-	//IControllerMaster,
-	ControlWrap,
-	GamepadMaster,
-	KeyboardMaster,
-	PlayerIndexMapper,
+    //IControllerMaster,
+    ControlWrap,
+    GamepadMaster,
+    KeyboardMaster,
+    PlayerIndexMapper,
 };
 
-export {
-	UIButton,
-	UIButtonOptional,
-	ControlType,
-	type ButtonState,
-	type Input,
-	type mappingRequirement,
-	type InputGroup,
-	InputSource,
-	type ControllerInfo,
-	type ControllerProfile,
-} from "./types";
+export * from "./types";
 
 export { buttonLayout } from "./config";
 

@@ -22,6 +22,8 @@ export default class MouseMaster extends EventEmitter {
 
 	//================================================================
 
+	public customStopEventFn: ((event: MouseEvent) => boolean) | undefined
+
 	protected lastxy: xy = { x: 0, y: 0 };
 	protected latestxy: xy = { x: 0, y: 0 };
 	protected delta: number = 0;
@@ -64,11 +66,11 @@ export default class MouseMaster extends EventEmitter {
 		}
 
 		/*
-        console.log(`${event.type}: 
-        ${event.clientY}, ${event.pageY}, ${event.offsetY  }, ${event.screenY }, 
-        ${event.buttons.toString(2)},${event.button}`);
-        //stopEvent(e);
-        */
+		console.log(`${event.type}: 
+		${event.clientY}, ${event.pageY}, ${event.offsetY  }, ${event.screenY }, 
+		${event.buttons.toString(2)},${event.button}`);
+		//stopEvent(e);
+		*/
 
 		if (event.type === "mousedown" || event.type === "mouseup") {
 			const buttonPress: boolean[] = [false, false, false, false, false];
@@ -88,19 +90,28 @@ export default class MouseMaster extends EventEmitter {
 					}
 				}
 			}
-
-			if (this.blockPrevNext && (event.button == 3 || event.button == 4)) {
-				stopEvent(event);
-			}
-			if (this.blockMiddle && event.button == 1) {
-				stopEvent(event);
+			if (this.customStopEventFn) {
+				if (this.customStopEventFn(event)) {
+					stopEvent(event);
+				}
+			} else {
+				if (this.blockPrevNext && (event.button == 3 || event.button == 4)) {
+					stopEvent(event);
+				}
+				if (this.blockMiddle && event.button == 1) {
+					stopEvent(event);
+				}
 			}
 		}
 	}
 
-	protected onRightClick(e: MouseEvent) {
-		if (this.blockRightClick) {
-			stopEvent(e);
+	protected onRightClick(event: MouseEvent) {
+		if (this.customStopEventFn) {
+			if (this.customStopEventFn(event)) {
+				stopEvent(event);
+			}
+		} else if (this.blockRightClick) {
+			stopEvent(event);
 		}
 	}
 

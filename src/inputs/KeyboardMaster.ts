@@ -66,6 +66,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
     private inited: boolean = false;
 
     public allowNonStructedSystemKey: Boolean = false;
+    public customStopEventFn: ((event: KeyboardEvent) => boolean) | undefined
 
     public get downKeys() {
         return Array.from(this.downKey);
@@ -79,7 +80,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         window.addEventListener("keydown", (event: KeyboardEvent) => {
             const keyCode = kbEventToKey(event);
             if (keyCode && !event.repeat) {
-                if (ignoreFunction.indexOf(keyCode) >= 0) {
+                if (this.customStopEventFn ? this.customStopEventFn(event) : ignoreFunction.indexOf(keyCode) >= 0) {
                     stopEvent(event);
                 }
                 this.listenDown(keyCode);

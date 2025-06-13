@@ -87,6 +87,7 @@ async function main() {
         input: "src/index.ts",
         output: [{
             file: repo.types,
+            banner,
             format: "es"
         }],
         plugins: [dts()]

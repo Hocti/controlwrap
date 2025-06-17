@@ -60,6 +60,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
     //================================================================
 
     private downKey: Set<string> = new Set();
+    private downKey2: Set<string> = new Set();
     //private lastDownKey:Set<string>=new Set();
 
     private buttons: Record<string, Button> = {};
@@ -69,7 +70,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
     public customStopEventFn: ((event: KeyboardEvent) => boolean) | undefined
 
     public get downKeyArray() {
-        return Array.from(this.downKey);
+        return Array.from(this.downKey2);
     }
 
     public kbEventToKey: (event: KeyboardEvent) => string = defaultKBEventToKey;
@@ -87,6 +88,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
                 }
                 this.listenDown(keyCode);
                 this.downKey.add(keyCode);
+                this.downKey2.add(keyCode);
                 if (!this.buttons[keyCode]) {
                     this.buttons[keyCode] = new Button();
                 }
@@ -98,6 +100,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
             const keyCode = this.kbEventToKey(event);
             if (keyCode) {
                 this.downKey.delete(keyCode);
+                this.downKey2.delete(keyCode);
                 if (!this.buttons[keyCode]) {
                     this.buttons[keyCode] = new Button();
                 }
@@ -110,6 +113,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
                 this.buttons[keyCode].release();
             }
             this.downKey.clear();
+            this.downKey2.clear();
         });
 
         this.totalKeyboard = 1;
@@ -362,7 +366,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         }
 
         //this.lastDownKey=new Set(this.downKey);
-        //this.downKey.clear();//* NOT CONFIRM
+        this.downKey.clear();
 
         return result;
     }

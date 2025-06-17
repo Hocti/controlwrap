@@ -34,7 +34,7 @@ const ignoreFunction: string[] = [
 ];
 //'ContextMenu','OSLeft','OSRight','BrowserBack','BrowserForward','BrowserRefresh','BrowserStop','BrowserSearch','BrowserFavorites','BrowserHome','VolumeMute','VolumeDown','VolumeUp','MediaTrackNext','MediaTrackPrevious','MediaStop','MediaPlayPause'];
 
-const kbEventToKey = (event: KeyboardEvent) => {
+const defaultKBEventToKey = (event: KeyboardEvent) => {
     if (event.code) {
         return event.code;
     }
@@ -68,9 +68,11 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
     public allowNonStructedSystemKey: Boolean = false;
     public customStopEventFn: ((event: KeyboardEvent) => boolean) | undefined
 
-    public get downKeys() {
+    public get downKeyArray() {
         return Array.from(this.downKey);
     }
+
+    public kbEventToKey: (event: KeyboardEvent) => string = defaultKBEventToKey;
 
     public init() {
         if (this.inited) {
@@ -78,7 +80,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         }
         this.inited = true;
         window.addEventListener("keydown", (event: KeyboardEvent) => {
-            const keyCode = kbEventToKey(event);
+            const keyCode = this.kbEventToKey(event);
             if (keyCode && !event.repeat) {
                 if (this.customStopEventFn ? this.customStopEventFn(event) : ignoreFunction.indexOf(keyCode) >= 0) {
                     stopEvent(event);
@@ -93,7 +95,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         });
 
         window.addEventListener("keyup", (event: KeyboardEvent) => {
-            const keyCode = kbEventToKey(event);
+            const keyCode = this.kbEventToKey(event);
             if (keyCode) {
                 this.downKey.delete(keyCode);
                 if (!this.buttons[keyCode]) {
@@ -360,7 +362,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
         }
 
         //this.lastDownKey=new Set(this.downKey);
-        this.downKey.clear();
+        //this.downKey.clear();//* NOT CONFIRM
 
         return result;
     }

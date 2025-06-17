@@ -1,6 +1,6 @@
 {
 	"name": "controlwrap",
-	"version": "1.3.2",
+	"version": "1.3.3",
 	"description": "wrap all gamepad,keyboard control in one place, output as your standard's conroller input format",
 	"main": "./dist/controlwrap.cjs.js",
 	"module": "./dist/controlwrap.esm.js",

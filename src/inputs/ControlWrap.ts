@@ -83,19 +83,17 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 
 	protected listenToMouse: boolean = false;
 
-	public wrappedInit(
-		{
-			requirement,
-			defaultGamePadmapping,
-			defaultKeyboardmappings,
-			mouse = false,
-		}: {
-			requirement: mappingRequirement;
-			defaultGamePadmapping: mappingGroup;
-			defaultKeyboardmappings: mappingGroup[];
-			mouse?: boolean;
-		},
-	): void {
+	public wrappedInit({
+		requirement,
+		defaultGamePadmapping,
+		defaultKeyboardmappings,
+		mouse = false,
+	}: {
+		requirement: mappingRequirement;
+		defaultGamePadmapping: mappingGroup;
+		defaultKeyboardmappings: mappingGroup[];
+		mouse?: boolean;
+	}): void {
 		this.init({ keyboard: true, gamepad: true });
 		this.importRequirement(requirement);
 		this.setDefaultGamepadMapping(defaultGamePadmapping);

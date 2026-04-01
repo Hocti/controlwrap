@@ -22,7 +22,7 @@ export default class MouseMaster extends EventEmitter {
 
 	//================================================================
 
-	public customStopEventFn: ((event: MouseEvent) => boolean) | undefined
+	public customStopEventFn: ((event: MouseEvent) => boolean) | undefined;
 
 	protected lastxy: xy = { x: 0, y: 0 };
 	protected latestxy: xy = { x: 0, y: 0 };

@@ -11,11 +11,11 @@ import KeyboardMaster from "./inputs/KeyboardMaster";
 import PlayerIndexMapper from "./useful/PlayerIndexMapper";
 
 export {
-    //IControllerMaster,
-    ControlWrap,
-    GamepadMaster,
-    KeyboardMaster,
-    PlayerIndexMapper,
+	//IControllerMaster,
+	ControlWrap,
+	GamepadMaster,
+	KeyboardMaster,
+	PlayerIndexMapper,
 };
 
 export * from "./types";

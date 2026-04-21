@@ -34,7 +34,6 @@ export type InputPreprocess = {
  * vibration
  */
 
-
 declare global {
 	interface Gamepad {
 		hapticActuators?: GamepadHapticActuator[];

@@ -1,52 +1,9 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Document</title>
-		<style>
-			html {
-				background-color: #000;
-				color: white;
-			}
 
-			td {
-				border: 1px solid grey;
-				padding: 2px 5px;
-			}
+			import { ControlWrap, GamepadMaster, ControlType, gamepad_standardizer } from "controlwrap";
 
-			#output table {
-				float: left;
-			}
-		</style>
-	</head>
-
-	<body>
-		<h1 id="f"></h1>
-		<button id="btn_listen_attack">listen which controller press attack or start (set Main player)</button
-		><br /><br />
-		<hr />
-		(open console to see the result) <br />
-		index:<input type="number" id="ip_index" value="100" /> <br />
-		<button id="btn_listen_controller">listen which key press on input id</button><br />
-		<button id="btn_map_all">btn_map_all</button><br />
-		<button id="btn_reset_Default">btn_reset_Default</button><br />
-		<!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
-
-		<hr />
-		<div id="output"></div>
-
-		<script>
-			let cwi, gmi;
-		</script>
-		<script type="module">
-			import { ControlWrap, GamepadMaster, ControlType, gamepad_standardizer } from "../dist/controlwrap.esm.js";
-
-			const output_f = document.getElementById("f");
 			const output = document.getElementById("output");
 
-			gmi = GamepadMaster.getInstance();
-			cwi = ControlWrap.getInstance();
+			const cwi = ControlWrap.getInstance();
 
 			cwi.wrappedInit({
 				requirement: {
@@ -520,6 +477,3 @@
         
         })
         */
-		</script>
-	</body>
-</html>

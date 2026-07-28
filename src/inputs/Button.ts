@@ -55,9 +55,10 @@ export class Button {
 	private Press: boolean = false;
 	private currFrameHistory: boolean[] = [];
 	private pressFrame: number = 0;
+	private forcedDouble: boolean = false;
 
-	//mix multi frame
-	mixFrameHistory: boolean[][] = [[]];
+	//mix multi frame (internal only — cross-frame edge stream for double-tap detection)
+	private mixFrameHistory: boolean[][] = [[]];
 
 	constructor() {
 		this.currFrameHistory = [false];
@@ -98,6 +99,11 @@ export class Button {
 			double = mixString.toString().indexOf("false,true,false,true") >= 0;
 		}
 
+		if (this.forcedDouble) {
+			this.forcedDouble = false;
+			double = true;
+		}
+
 		if (this.Press) {
 			if (this.pressFrame < 999) {
 				this.pressFrame++;
@@ -134,5 +140,14 @@ export class Button {
 		if (this.currFrameHistory[this.currFrameHistory.length - 1] !== false) {
 			this.currFrameHistory.push(false);
 		}
+	}
+
+	/**
+	 * Force `double` on the next {@link flush} regardless of press history.
+	 * For injected input (a touch UI's "double-tap shortcut" button) where the
+	 * double-tap is a UI gesture, not something the frame history can show.
+	 */
+	public forceDouble(): void {
+		this.forcedDouble = true;
 	}
 }

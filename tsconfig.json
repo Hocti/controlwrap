@@ -1,8 +1,13 @@
 {
-  "extends": "@mono/configs/tsconfig.base.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src", "demo", "vite.config.ts"]
+  "include": [
+    "src",
+    "demo",
+    "vite.config.ts",
+    "global.d.ts"
+  ]
 }

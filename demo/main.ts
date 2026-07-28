@@ -1,7 +1,87 @@
 
-			import { ControlWrap, GamepadMaster, ControlType, gamepad_standardizer } from "controlwrap";
+			import {
+				ControlWrap,
+				GamepadMaster,
+				ControlType,
+				buttonLayout,
+				gamepad_standardizer,
+			} from "controlwrap";
 
 			const output = document.getElementById("output");
+			const glyphLegendEl = document.getElementById("glyph_legend");
+
+			// Inject the controller + keyboard glyph webfonts (gamepad_fonts) once.
+			// One call installs every @font-face, pad and keyboard alike.
+			gamepad_standardizer.installPadFonts();
+
+			// Xbox pads ship two looks: 'one' (grey chip) and '360' (coloured chip).
+			// Everything re-renders on toggle, so it doubles as a font-swap demo.
+			let xboxStyle = "one";
+			document.getElementById("cb_xbox360").addEventListener("change", (e) => {
+				xboxStyle = e.target.checked ? "360" : "one";
+			});
+
+			//controlwrap detects the controller family as a buttonLayout; that maps 1:1
+			//onto a gamepad_fonts font id
+			const LAYOUT_FONT_ID = {
+				[buttonLayout.sony]: "playstation",
+				[buttonLayout.nintendo]: "switch",
+			};
+
+			const padFontFamily = (index) => {
+				const layout = cwi.getGamepadExtra(index)?.layout;
+				const id = LAYOUT_FONT_ID[layout] ?? (xboxStyle === "360" ? "xbox-360" : "xbox-one");
+				return gamepad_standardizer.fontFamily(id);
+			};
+
+			//a direction looks identical on every pad, so the four d-pad slots are drawn
+			//from the one shared "common" sheet instead of the vendor-styled one
+			const DPAD_SLOTS = ["up", "down", "left", "right"];
+
+			const padGlyph = (index, sdlButtonName) => {
+				//gamepad mappings hold SDL names ('a','leftshoulder','dpup'), and the
+				//standard name order lines up 1:1 with the neutral font slots
+				const slot = gamepad_standardizer.buttonSlot(
+					gamepad_standardizer.SYSTEM_BUTTON_NAME.indexOf(sdlButtonName)
+				);
+				if (!slot) return "";
+				if (DPAD_SLOTS.includes(slot)) {
+					return `<span class="pad-glyph" style="font-family:'${gamepad_standardizer.COMMON_FONT_FAMILY}'">${gamepad_standardizer.directionGlyphChar("dpad", slot)}</span>`;
+				}
+				return `<span class="pad-glyph" style="font-family:'${padFontFamily(index)}'">${gamepad_standardizer.glyphChar(slot)}</span>`;
+			};
+
+			/** The live d-pad / stick state of one player, as three common-font glyphs. */
+			const directionGlyphs = (input) => {
+				const cell = (label, source, wrap, double) => {
+					if (!wrap) return "";
+					const char = gamepad_standardizer.directionGlyphChar(
+						source,
+						gamepad_standardizer.numpadDirection(wrap.numpad),
+						double
+					);
+					return `<td>${label}<br /><span class="pad-glyph" style="font-family:'${gamepad_standardizer.COMMON_FONT_FAMILY}'">${char}</span></td>`;
+				};
+				return `<table><tr>
+					${cell("dpad", "dpad", input.mixedDpad, input.doublePressDirection)}
+					${cell("L", "lstick", input.analog)}
+					${cell("R", "rstick", input.analog_right)}
+				</tr></table>`;
+			};
+
+			const kbGlyph = (code) => {
+				//keyboard mappings hold KeyboardEvent.code ('KeyW','Numpad8'); installPadFonts()
+				//already injected the key-cap font alongside the pad ones
+				const char = gamepad_standardizer.kbGlyphChar(code);
+				if (!char) return "";
+				return `<span class="kb-glyph" style="font-family:'${gamepad_standardizer.KEYBOARD_FONT_FAMILY}'">${char}</span>`;
+			};
+
+			/** Glyph for one mapped key, picking the font from the controller type. */
+			const glyphOf = (index, keyName) => {
+				const [cType] = cwi.parseIndex(index);
+				return cType === ControlType.GAMEPAD ? padGlyph(index, keyName) : kbGlyph(keyName);
+			};
 
 			const cwi = ControlWrap.getInstance();
 
@@ -90,10 +170,45 @@
 
 			let f = 0;
 
+			/** Wrap pre-rendered markup so dict2Table prints it instead of JSON. */
+			const rawHTML = (html) => ({ __html: html });
+
+			/** The mapping table, with each mapped key shown as its glyph + name. */
+			const mapping2Table = (index, mapping) => {
+				let h = `<table>`;
+				for (let btnName in mapping) {
+					const keys = [].concat(mapping[btnName] ?? []);
+					const cells = keys
+						.map((key) => `${glyphOf(index, key)}<span class="key-name">${key}</span>`)
+						.join(" / ");
+					h += `<tr><td>${btnName}</td><td>${cells}</td></tr>`;
+				}
+				return h + `</table>`;
+			};
+
+			/** Every standard button of each connected pad, in that pad's own font. */
+			const glyphLegend = () => {
+				let h = "";
+				for (const index of cwi.getIndexs()) {
+					const [cType] = cwi.parseIndex(index);
+					if (cType !== ControlType.GAMEPAD) continue;
+					const chips = gamepad_standardizer.SYSTEM_BUTTON_NAME.map((name) =>
+						padGlyph(index, name)
+					).join("");
+					h += `<div>${index}: ${cwi.getName(index)}<br />${chips}</div>`;
+				}
+				return h;
+			};
+
 			const dict2Table = (dict) => {
 				let h = `<table>`;
 				for (let key in dict) {
-					if (dict[key] && dict[key].constructor == Object) {
+					if (dict[key] && dict[key].__html !== undefined) {
+						h += `<tr>
+                    <td>${key}</td>
+                    <td>${dict[key].__html}</td>
+                    </tr>`;
+					} else if (dict[key] && dict[key].constructor == Object) {
 						h += `<tr>
                     <td>${key}</td>
                     <td>${dict2Table(dict[key])}</td>
@@ -110,11 +225,13 @@
 				return h;
 			};
 			let lastH = "";
+			let lastLegend = "";
 			let framePassed = 0;
 			const etf = () => {
 				let h = "";
 
-				const all = cwi.update(true);
+				//full flush, not uiOnly — the direction glyphs below need the dpad/analog state
+				const all = cwi.update(false);
 
 				h += `<h1>Main player id:${cwi.mainControllerIndex}</h1>`;
 
@@ -132,8 +249,9 @@
 						type: "player",
 						index: indexNum,
 						name: cwi.getName(indexNum),
+						direction: rawHTML(directionGlyphs(input)),
 						...input,
-						mapping,
+						mapping: rawHTML(mapping2Table(indexNum, mapping)),
 					});
 				}
 
@@ -161,6 +279,12 @@
 				if (lastH != h) {
 					output.innerHTML = h;
 					lastH = h;
+				}
+
+				const legend = glyphLegend();
+				if (lastLegend != legend) {
+					glyphLegendEl.innerHTML = legend;
+					lastLegend = legend;
 				}
 				//output_f.innerHTML=++f
 				framePassed++;

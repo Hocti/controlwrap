@@ -1,5 +1,5 @@
 import { Input } from "../types";
-import { dpad } from "gamepad_standardizer";
+import { Dpad } from "gamepad_standardizer";
 
 export function checkAnyKeypress(input: Input, ui_only: boolean = false): boolean {
 	if (input.ui_tap.length > 0) {
@@ -14,7 +14,7 @@ export function checkAnyKeypress(input: Input, ui_only: boolean = false): boolea
 		}
 	}
 	for (let key in input.directionButton) {
-		if (input.directionButton[key as dpad].just) {
+		if (input.directionButton[key as Dpad].just) {
 			return true;
 		}
 	}

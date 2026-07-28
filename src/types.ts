@@ -1,10 +1,10 @@
-import { dpad } from "gamepad_standardizer";
-import type { dpadPress, directionWrap, xy } from "gamepad_standardizer";
-export { dpad };
-export type { dpadPress, directionWrap, xy };
+import { Dpad } from "gamepad_standardizer";
+import type { DpadPress, DirectionWrap, XY } from "gamepad_standardizer";
+export { Dpad };
+export type { DpadPress, DirectionWrap, XY };
 
 import {
-	GAMPEPAD_INDEX_OFFSET,
+	GAMEPAD_INDEX_OFFSET,
 	SYSTEM_INDEX_OFFSET,
 	UI_INDEX_OFFSET,
 	KEYBOARD_HARDCODE_UI_BUTTON,
@@ -12,7 +12,7 @@ import {
 } from "./config";
 
 export const UIButton = {
-	...dpad,
+	...Dpad,
 	confirm: "confirm",
 	escape: "escape",
 };
@@ -24,11 +24,33 @@ export enum UIButtonOptional {
 }
 export const AllUIButton = { ...UIButton, ...UIButtonOptional };
 
+/**
+ * Who the shared UI channel (`InputGroup.ui`) listens to. A game is two different things at
+ * different moments and the two want opposite answers:
+ *
+ * - `single` — **one person is driving** (title, main menu, settings, results). Every connected
+ *   device feeds the UI channel, so whichever pad is in reach works, and the keyboard's fixed
+ *   menu keys (arrows / Enter / Backspace / Tab / Escape) are always live no matter what the
+ *   four keyboard seats have mapped for themselves. This is the default: a game starts in a
+ *   menu, and a menu that answers to only one of two plugged-in pads is a bug every time.
+ *
+ * - `multi` — **everyone is playing at once** (a lobby where each seat joins itself, the match).
+ *   Only the main controller feeds the shared channel; every other device is read per seat from
+ *   `InputGroup.player`, through that seat's own mapping. Without this, one player pressing
+ *   their confirm to join would also press whatever the shared cursor happens to be on.
+ *
+ * Escape reaches the UI in both modes — it is the way out, and it is never a seat's private key.
+ */
+export enum UIInputMode {
+	single = "single",
+	multi = "multi",
+}
+
 export enum ControlType {
 	system = "system",
 	KEYBOARD = "keyboard",
 	GAMEPAD = "gamepad",
-	//TOUCH="touch",
+	VIRTUAL = "virtual",
 	//MOUSE="mouse",
 }
 
@@ -49,20 +71,25 @@ export type ButtonState = {
 
 export type gameInput = {
 	//raw direction
-	dpad?: dpadPress & { numpad: number } & xy; //gamepad dpad only, not analog
-	analog?: directionWrap; //left analog only
-	analog_right?: directionWrap; //right analog only
+	dpad?: DpadPress & { numpad: number } & XY; //gamepad dpad only, not analog
+	analog?: DirectionWrap; //left analog only
+	analog_right?: DirectionWrap; //right analog only
 
 	//processed direction, mixed with left analog and dpad
-	mixedDpad?: dpadPress & { numpad: number } & xy;
-	directionButton?: Record<dpad, ButtonState>;
+	mixedDpad?: DpadPress & { numpad: number } & XY;
+	directionButton?: Record<Dpad, ButtonState>;
 	doublePressDirection?: boolean;
 
 	//button
 	button?: Record<string, ButtonState>;
 
 	//extra
-	//command?:string[],
+	/**
+	 * Free-form one-frame messages a device can raise alongside the button/direction state.
+	 * A physical gamepad has no such channel and never sets this — it exists for injected
+	 * input (a touch UI: `'super'`, `'touchmove:10,-5'`). Cleared every frame.
+	 */
+	command?: string[];
 };
 export type systemInput = {
 	source?: ControlType;
@@ -98,8 +125,8 @@ export type latestLayoutGroup = {
 };
 
 export type mouseInput = {
-	xy?: xy;
-	xyDelta?: xy;
+	xy?: XY;
+	xyDelta?: XY;
 	delta: number;
 	buttons: Record<string, ButtonState>;
 };
@@ -110,33 +137,5 @@ export type InputGroup = {
 	[InputSource.player]: Record<number, Input>;
 	[InputSource.mouse]?: mouseInput;
 };
-export type ControllerInfo = {
-	wrappedIndex: number; //0 mixed keyboard+gamepad
-	type: ControlType;
-	index: number; //gamepad index / keyboard index
-	name: string; //'keyboard' / gamepad_codeName
-	profile?: string;
-	isMainPlayer: boolean;
-};
-
-export type ControllerProfile = {
-	name: string;
-	type: "keyboard" | "xinput" | "gamepadName"; //gamepad_codeName
-	gamepadName?: string;
-	isDefault: boolean; //for 'keyboard'|'xinput' only
-	mapping: mappingGroup;
-};
-
-/*
-developer need input:
-
-mappingRequirement:
-default gamepad mappingRequirement
-default Keyboard mappingRequirement
-
-ControllerProfile:
-default xinput ControllerProfile
-default Keyboard ControllerProfile [array of 1~4]
-
-player可自己再加減ControllerProfile
-*/
+// NOTE: the old draft `ControllerInfo` / `ControllerProfile` types were removed here —
+// the new profile model lives in `useful/ProfileMapping.ts` (`ControllerProfile`).

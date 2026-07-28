@@ -8,14 +8,17 @@ import {
 	mappingGroup,
 	mappingRequirement,
 	InputSource,
+	UIInputMode,
 } from "../types";
 
 import { IControllerMaster } from "./IControllerMaster";
 import GamepadMaster from "./GamepadMaster";
 import KeyboardMaster from "./KeyboardMaster";
+import VirtualGamepadMaster from "./VirtualGamepadMaster";
 import GamePadExtra from "./GamePadExtra";
 import {
-	GAMPEPAD_INDEX_OFFSET,
+	GAMEPAD_INDEX_OFFSET,
+	VIRTUAL_INDEX_OFFSET,
 	SYSTEM_INDEX_OFFSET,
 	UI_INDEX_OFFSET,
 	KEYBOARD_HARDCODE_UI_BUTTON,
@@ -23,6 +26,7 @@ import {
 } from "../config";
 import { checkAnyKeypress } from "./common";
 import MouseMaster from "./MouseMaster";
+import { debugLog } from "../utils/debug";
 
 export default class ControlWrap extends EventEmitter implements IControllerMaster {
 	protected static instance: ControlWrap;
@@ -41,6 +45,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 		return {
 			[ControlType.KEYBOARD]: KeyboardMaster.isSupported(),
 			[ControlType.GAMEPAD]: GamepadMaster.isSupported(),
+			[ControlType.VIRTUAL]: VirtualGamepadMaster.isSupported(),
 			//[ControlType.TOUCH]:'ontouchstart' in window,
 			//[ControlType.MOUSE]:'onmousedown' in window,
 		};
@@ -49,6 +54,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	static masterRecord: Partial<Record<ControlType, IControllerMaster>> = {
 		[ControlType.KEYBOARD]: KeyboardMaster.getInstance(),
 		[ControlType.GAMEPAD]: GamepadMaster.getInstance(),
+		[ControlType.VIRTUAL]: VirtualGamepadMaster.getInstance(),
 		//[ControlType.TOUCH]: KeyboardMaster.getInstance(),
 		//[ControlType.MOUSE]: KeyboardMaster.getInstance()
 	};
@@ -60,6 +66,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	protected listening: Partial<Record<ControlType, boolean>> = {
 		[ControlType.GAMEPAD]: false,
 		[ControlType.KEYBOARD]: false,
+		[ControlType.VIRTUAL]: false,
 		//[ControlType.MOUSE]:false,
 		//[ControlType.TOUCH]:false,
 	};
@@ -83,24 +90,63 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 
 	protected listenToMouse: boolean = false;
 
+	/** Remove every window listener the masters added and reset the singleton. */
+	public dispose(): void {
+		(ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).dispose();
+		(ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).dispose();
+		if (this.listenToMouse) {
+			MouseMaster.getInstance().dispose();
+		}
+		for (const controlType of Object.values(ControlType)) {
+			this.listening[controlType] = false;
+		}
+		this.listenToMouse = false;
+		this.removeAllListeners();
+		ControlWrap.instance = undefined as unknown as ControlWrap;
+	}
+
 	public wrappedInit({
 		requirement,
 		defaultGamePadmapping,
 		defaultKeyboardmappings,
 		mouse = false,
+		virtual = false,
+		preserveNavKeys = true,
+		ignoreGamepadWhenWindowInactive = true,
 	}: {
 		requirement: mappingRequirement;
 		defaultGamePadmapping: mappingGroup;
 		defaultKeyboardmappings: mappingGroup[];
 		mouse?: boolean;
+		virtual?: boolean;
+		/**
+		 * Keep arrow keys + Enter reserved as global keyboard UI-nav keys (default true). Set
+		 * false to free them for player mappings (e.g. an arrow-keys player on keyboard 2).
+		 * Escape is always preserved regardless. See {@link setPreserveNavKeys}.
+		 */
+		preserveNavKeys?: boolean;
+		/**
+		 * Drop gamepad input while the window has no focus (default true).
+		 * See {@link ignoreGamepadWhenWindowInactive}.
+		 */
+		ignoreGamepadWhenWindowInactive?: boolean;
 	}): void {
-		this.init({ keyboard: true, gamepad: true });
+		this.init({ keyboard: true, gamepad: true, virtual });
+		this.setPreserveNavKeys(preserveNavKeys);
+		this.ignoreGamepadWhenWindowInactive = ignoreGamepadWhenWindowInactive;
 		this.importRequirement(requirement);
 		this.setDefaultGamepadMapping(defaultGamePadmapping);
 		for (let i = 0; i < defaultKeyboardmappings.length; i++) {
 			this.setDefaultKeyboardMapping(i, defaultKeyboardmappings[i]);
 		}
 		this.setPlayerCountFromKeyboard(defaultKeyboardmappings.length);
+
+		if (virtual) {
+			// virtual pad shares the gamepad button layout / default mapping
+			const vm = ControlWrap.masterRecord[ControlType.VIRTUAL] as VirtualGamepadMaster;
+			vm.setDefaultMapping(defaultGamePadmapping);
+			vm.connect(0);
+		}
 
 		if (mouse) {
 			this.listenToMouse = true;
@@ -137,6 +183,54 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	public setPlayerCountFromKeyboard(num: number = 1): void {
 		(ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).setPlayerCountFromKeyboard(num);
 	}
+
+	/**
+	 * Toggle whether the keyboard's arrow keys + Enter are preserved as global UI-navigation
+	 * keys. Default true = they always drive menu navigation and cannot be remapped away from
+	 * keyboard 0. Set false to free them for player mappings (e.g. an arrow-keys player on a
+	 * second keyboard); menu navigation then follows each player's own mapping. Escape is
+	 * ALWAYS preserved — no flag can disable it.
+	 */
+	public setPreserveNavKeys(preserve: boolean): void {
+		(ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).preserveNavKeys = preserve;
+	}
+
+	/**
+	 * Ignore gamepad input while the window does not have focus (default true).
+	 *
+	 * A keyboard already behaves this way — an unfocused window receives no key events — but a
+	 * gamepad is polled, so a pad resting on a button, or a player using another window, would
+	 * otherwise keep walking this game's menus in the background. Turn it off for a window that
+	 * is *meant* to be driven unfocused (an overlay, a second display, a kiosk).
+	 */
+	public get ignoreGamepadWhenWindowInactive(): boolean {
+		return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).ignoreWhenWindowInactive;
+	}
+	public set ignoreGamepadWhenWindowInactive(ignore: boolean) {
+		(ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).ignoreWhenWindowInactive = ignore;
+	}
+
+	//ui input mode================================================================
+
+	private _uiInputMode: UIInputMode = UIInputMode.single;
+
+	/**
+	 * Who drives the shared UI channel — see {@link UIInputMode}. Menus want `single` (the
+	 * default), a lobby and the match itself want `multi`. Switch it as the game changes screen.
+	 */
+	public get uiInputMode(): UIInputMode {
+		return this._uiInputMode;
+	}
+	public set uiInputMode(mode: UIInputMode) {
+		this._uiInputMode = mode;
+		(ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).singleUserUI =
+			mode === UIInputMode.single;
+	}
+
+	/** Whether every connected device — not just the main one — feeds the shared UI channel. */
+	private everyDeviceDrivesUI(): boolean {
+		return this._uiInputMode === UIInputMode.single || this.allowMainPlayerUseAllController;
+	}
 	public getPlayerCountFromKeyboard(): number {
 		return (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).count();
 	}
@@ -144,6 +238,11 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	//================================================================
 
 	public mainControllerIndex: number = -1;
+	/**
+	 * Force every device into the shared UI channel even in {@link UIInputMode.multi}. Predates
+	 * the mode and is subsumed by it — `uiInputMode = single` is the same thing, said as what it
+	 * is for. Left in because it is a public field somebody may be setting.
+	 */
 	public allowMainPlayerUseAllController: boolean = false;
 	private _lastInputIndex: number = -1;
 	private defaultButtonLayout: latestLayoutGroup = {
@@ -153,7 +252,14 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	};
 	private lastButtonLayout: latestLayoutGroup = this.defaultButtonLayout;
 
+	private _lastUpdateTime: number = -1;
+
 	public update(uiOnly: boolean = false): InputGroup {
+		const now = performance.now();
+		if (now - this._lastUpdateTime < 1) {
+			debugLog("update() called twice in the same frame — input between calls is lost");
+		}
+		this._lastUpdateTime = now;
 		const ips: Record<number, Input> = this.flushInner(uiOnly);
 		const result: InputGroup = {
 			[InputSource.system]: ips[SYSTEM_INDEX_OFFSET],
@@ -197,7 +303,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 					if (
 						re[index].source === ControlType.system ||
 						this.mainControllerIndex === mixedIndex ||
-						this.allowMainPlayerUseAllController
+						this.everyDeviceDrivesUI()
 					) {
 						if (checkAnyKeypress(re[index])) {
 							if (
@@ -221,18 +327,24 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 		if (this._lastInputIndex != thisInputIndex) {
 			this._lastInputIndex = thisInputIndex;
 			this.lastButtonLayout = this.renewSystemButtonLayout(thisInputIndex);
-			//console.log(this.lastButtonLayout)
 			this.emit("changeLastInputIndex", {
 				index: thisInputIndex,
 				buttonLayout: this.lastButtonLayout,
 			});
 		}
-		result[UI_INDEX_OFFSET] = {
-			//source:ControlType.KEYBOARD,
+		const aggregate = {
 			ui_tap: [...ui_tap_set],
 			ui_pressing: [...ui_pressing_set],
 			ui_repeat: [...ui_repeat_set],
 		};
+		result[UI_INDEX_OFFSET] = { ...aggregate };
+		// System channel = the single main-user's aggregated UI actions (keyboard hardcoded
+		// keys + the main gamepad / virtual pad — same set fed into UI above). Previously only
+		// KeyboardMaster wrote this channel, so escape/confirm/pause worked from the keyboard
+		// but not a gamepad's start button. Feeding the aggregate here makes those actions work
+		// uniformly from any device for single-user UI. Per-seat multiplayer input is untouched
+		// (it stays in result[index] and is read via ips.player in the lobby).
+		result[SYSTEM_INDEX_OFFSET] = { source: ControlType.system, ...aggregate };
 
 		return result;
 	}
@@ -256,6 +368,34 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 			return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).getGamepadExtra(cIndex);
 		}
 		return undefined;
+	}
+
+	/**
+	 * Device identity used by ProfileMapping to decide profile compatibility.
+	 *  - keyboard → { device: 'keyboard', xinput: false }
+	 *  - gamepad  → { device: `${vendor}:${product}`, xinput: standard } (falls back to
+	 *               the controller name when vendor/product are unavailable)
+	 */
+	public getDeviceInfo(index: number): { device: string; xinput: boolean } {
+		const [cType] = this.parseIndex(index);
+		if (cType === ControlType.KEYBOARD) {
+			return { device: "keyboard", xinput: false };
+		}
+		if (cType === ControlType.VIRTUAL) {
+			return { device: "virtual", xinput: true }; // virtual pad emulates the standard layout
+		}
+		if (cType === ControlType.GAMEPAD) {
+			const extra = this.getGamepadExtra(index);
+			if (extra) {
+				const vendor = extra.getVendor();
+				const product = extra.getProduct();
+				if (vendor && product) {
+					return { device: `${vendor}:${product}`, xinput: extra.isStandard() };
+				}
+				return { device: this.getName(index) || "gamepad", xinput: extra.isStandard() };
+			}
+		}
+		return { device: this.getName(index) || "gamepad", xinput: false };
 	}
 
 	//indexing================================================================
@@ -283,17 +423,23 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	}
 
 	public parseIndex(index: number = 0): [ControlType, number] {
-		if (index < GAMPEPAD_INDEX_OFFSET) {
+		if (index < GAMEPAD_INDEX_OFFSET) {
 			return [ControlType.KEYBOARD, index];
 		}
-		return [ControlType.GAMEPAD, index - GAMPEPAD_INDEX_OFFSET];
+		if (index < VIRTUAL_INDEX_OFFSET) {
+			return [ControlType.GAMEPAD, index - GAMEPAD_INDEX_OFFSET];
+		}
+		return [ControlType.VIRTUAL, index - VIRTUAL_INDEX_OFFSET];
 	}
 
 	public makeIndex(cType: ControlType, index: number = 0): number {
 		if (cType == ControlType.KEYBOARD) {
 			return index;
 		}
-		return GAMPEPAD_INDEX_OFFSET + index;
+		if (cType == ControlType.VIRTUAL) {
+			return VIRTUAL_INDEX_OFFSET + index;
+		}
+		return GAMEPAD_INDEX_OFFSET + index;
 	}
 
 	//listen================================================================
@@ -305,7 +451,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 					ControlWrap.masterRecord[controlType]!.listenControllerIndexFromKeys(keys)
 						.then((i) => {
 							const mixIndex = this.makeIndex(controlType, i);
-							//console.log('race result',mixIndex,controlType,i)
+							debugLog('listenControllerIndexFromKeys race result', mixIndex, controlType, i);
 							resolve(mixIndex);
 							this.cancelListen("race success");
 						})

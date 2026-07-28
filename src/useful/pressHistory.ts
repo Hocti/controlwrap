@@ -165,7 +165,6 @@ class pressHistory {
 				if (!firstPress) {
 					firstPress = true;
 				} else {
-					//console.log('doublePress',buttonName,result.map((v)=>v.button!.attack));
 					return true;
 				}
 			}

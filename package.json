@@ -1,48 +1,52 @@
 {
-  "name": "controlwrap",
-  "version": "2.0.1",
-  "description": "wrap all gamepad,keyboard control in one place, output as your standard's conroller input format",
-  "type": "module",
-  "license": "MIT",
-  "author": "Hocti",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Hocti/controlwrap.git"
-  },
-  "main": "./dist/controlwrap.mjs",
-  "module": "./dist/controlwrap.mjs",
-  "types": "./dist/controlwrap.d.ts",
-  "unpkg": "./dist/controlwrap.iife.js",
-  "exports": {
-    ".": {
-      "types": "./dist/controlwrap.d.ts",
-      "development": "./src/index.ts",
-      "import": "./dist/controlwrap.mjs"
-    }
-  },
-  "files": [
-    "./dist/",
-    "LICENSE",
-    "package.json",
-    "README.md"
-  ],
-  "readme": "README.md",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist .turbo"
-  },
-  "prettier": "@mono/configs/prettier.json",
-  "dependencies": {
-    "eventemitter3": "^5.0.1",
-    "gamepad_standardizer": "workspace:^"
-  },
-  "devDependencies": {
-    "@mono/configs": "workspace:*",
-    "@vitejs/plugin-basic-ssl": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "vite-plugin-dts": "latest"
-  }
+	"name": "controlwrap",
+	"version": "2.0.1",
+	"description": "wrap all gamepad,keyboard control in one place, output as your standard's conroller input format",
+	"type": "module",
+	"license": "MIT",
+	"author": "Hocti",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Hocti/controlwrap.git"
+	},
+	"main": "./dist/controlwrap.mjs",
+	"module": "./dist/controlwrap.mjs",
+	"types": "./dist/controlwrap.d.ts",
+	"unpkg": "./dist/controlwrap.iife.js",
+	"exports": {
+		".": {
+			"types": "./dist/controlwrap.d.ts",
+			"development": "./src/index.ts",
+			"import": "./dist/controlwrap.mjs"
+		}
+	},
+	"files": [
+		"./dist/",
+		"LICENSE",
+		"package.json",
+		"README.md"
+	],
+	"readme": "README.md",
+	"scripts": {
+		"dev": "vite  --host",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "vitest run --passWithNoTests",
+		"typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+		"clean": "rm -rf dist .turbo"
+	},
+	"dependencies": {
+		"eventemitter3": "^5.0.1",
+		"gamepad_standardizer": "workspace:^"
+	},
+	"devDependencies": {
+		"@mono/configs": "workspace:*",
+		"@typescript/typescript6": "^6.0.2",
+		"@vitejs/plugin-basic-ssl": "latest",
+		"happy-dom": "^20.11.1",
+		"typescript": "latest",
+		"vite": "latest",
+		"vite-plugin-dts": "latest",
+		"vitest": "^4.1.10"
+	}
 }

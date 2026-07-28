@@ -18,6 +18,29 @@
 			#output table {
 				float: left;
 			}
+
+			.pad-glyph,
+			.kb-glyph {
+				font-size: 24px;
+				line-height: 1;
+				vertical-align: middle;
+			}
+
+			.key-name {
+				opacity: 0.6;
+				font-size: 12px;
+				margin-left: 4px;
+			}
+
+			#glyph_legend {
+				clear: both;
+				padding-bottom: 10px;
+			}
+
+			#glyph_legend .pad-glyph {
+				font-size: 30px;
+				margin-right: 2px;
+			}
 		</style>
 	</head>
 
@@ -32,8 +55,12 @@
 		<button id="btn_map_all">btn_map_all</button><br />
 		<button id="btn_reset_Default">btn_reset_Default</button><br />
 		<!--<button id="map_raw_btn">map_raw_btn</button><br/>-->
+		<label
+			><input type="checkbox" id="cb_xbox360" /> Xbox 360 glyph style (coloured chips)</label
+		><br />
 
 		<hr />
+		<div id="glyph_legend"></div>
 		<div id="output"></div>
     <script type="module" src="./main.ts"></script>
   </body>

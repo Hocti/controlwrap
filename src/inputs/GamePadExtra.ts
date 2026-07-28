@@ -2,22 +2,25 @@ import {
 	getGamepadInfo,
 	getDirection,
 	getDirectionAvailable,
-	directSource,
+	getAnalogDirection,
+	getDpadDirection,
+	DirectSource,
 	getButtonPress,
 	getButtonName,
 	DP_BUTTON_NAME,
-	type gamepadInfo,
-	dpad,
-	dpadPress,
-	directionWrap,
-	xy,
+	type GamepadInfo,
+	Dpad,
+	DpadPress,
+	DirectionWrap,
+	XY,
 } from "gamepad_standardizer";
 import { ButtonState } from "../types";
+import { debugLog } from "../utils/debug";
 import { Button } from "./Button";
 import { buttonLayout } from "../config";
 
 export type InputPreprocess = {
-	direction?: Record<directSource, directionWrap | null>;
+	direction?: Record<DirectSource, DirectionWrap | null>;
 	button: Record<string, ButtonState>;
 	directionButton: Record<string, ButtonState>;
 };
@@ -45,13 +48,13 @@ export default class GamePadExtra {
 	public lastGamepad: Gamepad;
 
 	//info
-	private info: gamepadInfo | undefined;
+	private info: GamepadInfo | undefined;
 	private btn_names: (string | null)[] = [];
-	private directionAvailable: Record<directSource, boolean> | undefined;
+	private directionAvailable: Record<DirectSource, boolean> | undefined;
 
 	private buttons: Record<string, Button> = {};
 
-	private directionButton: Record<dpad, Button> = {
+	private directionButton: Record<Dpad, Button> = {
 		up: new Button(),
 		down: new Button(),
 		left: new Button(),
@@ -60,16 +63,27 @@ export default class GamePadExtra {
 
 	public analogThreshold: number = 0.15;
 	public swapAB: boolean = false;
-	//public btn_display_names:(string|null)[]=[];
 	public layout: buttonLayout = buttonLayout.xbox;
 
 	public getName(): string {
 		return this.info?.name ?? "";
 	}
+	/** SDL vendor id (hex string) or '' if unknown/not loaded yet. */
+	public getVendor(): string {
+		return this.info?.vendor ?? "";
+	}
+	/** SDL product id (hex string) or '' if unknown/not loaded yet. */
+	public getProduct(): string {
+		return this.info?.product ?? "";
+	}
+	/** Whether the browser already reports this pad as standard (xinput) mapping. */
+	public isStandard(): boolean {
+		return this.info?.standard ?? false;
+	}
 	public getButtonNames(): (string | null)[] {
 		return this.btn_names;
 	}
-	public getDirectionAvailable(): Record<directSource, boolean> {
+	public getDirectionAvailable(): Record<DirectSource, boolean> {
 		if (!this.directionAvailable) {
 			return {
 				dpad: false,
@@ -85,8 +99,9 @@ export default class GamePadExtra {
 
 		getGamepadInfo(gamepad).then((info) => {
 			this.info = info;
+			//one shared name set for every vendor — the per-vendor *look* is a webfont
+			//choice, see `layout` / gamepad_standardizer's `padFontId`
 			this.btn_names = getButtonName(this.info!);
-			//this.btn_display_names=getButtonName(this.info!,true)
 			this.directionAvailable = getDirectionAvailable(this.info!);
 			this.swapAB = this.info!.defaultSwapAB ?? false;
 
@@ -108,14 +123,58 @@ export default class GamePadExtra {
 					this.layout = buttonLayout.nintendo;
 				}
 			}
-			//console.log(gamepad,info,this.btn_names,this.directionAvailable);
 			//this.flush(gamepad);
 		});
 	}
 
 	private unchangeCache: Record<string, number> = {};
 
-	public flush(gamepad: Gamepad, unchange: boolean = false): InputPreprocess {
+	/**
+	 * What {@link getDirection} would report for a pad at rest — same shape, same `null`s for the
+	 * sources this pad does not have, so a caller reading `direction.dpad` cannot tell a released
+	 * pad from an ignored one.
+	 */
+	private neutralDirection(): Record<DirectSource, DirectionWrap | null> {
+		const available = this.getDirectionAvailable();
+		const centre: XY = { x: 0, y: 0 };
+		return {
+			dpad: available.dpad
+				? getDpadDirection({ up: false, down: false, left: false, right: false })
+				: null,
+			leftAnalog: available.leftAnalog ? getAnalogDirection(centre, this.analogThreshold) : null,
+			rightAnalog: available.rightAnalog ? getAnalogDirection(centre, this.analogThreshold) : null,
+		};
+	}
+
+	// Buttons / directions that were held when the window went away, and so must be physically
+	// let go before they count again — see `flush`'s forceRelease.
+	private heldThroughRelease: Set<string> = new Set();
+	private wasForceReleased: boolean = false;
+
+	/** `press` as the game should see it: false while `key` is still being held from before. */
+	private holdBlock(key: string, press: boolean, resumed: boolean): boolean {
+		if (resumed && press) {
+			this.heldThroughRelease.add(key);
+		}
+		if (!this.heldThroughRelease.has(key)) return press;
+		if (!press) this.heldThroughRelease.delete(key);
+		return false;
+	}
+
+	/**
+	 * @param unchange     UI-only pass: report raw press/just without touching the {@link Button}
+	 *                     state machines (no tap / double / repeat bookkeeping).
+	 * @param forceRelease Read the pad as if nothing were touched — for a window that does not
+	 *                     have focus (see `isWindowActive`). The button state machines are still
+	 *                     driven, so a press held across the blur is *released* here rather than
+	 *                     frozen: it cannot stick.
+	 *
+	 * Whatever was still held when the window came back is then ignored until it is let go, which
+	 * is what the keyboard does for free (a blurred window is sent no `keyup`, so `onBlur` drops
+	 * every key and a key still down produces nothing until it is pressed again). Without it,
+	 * returning to the window would fire whatever the player happened to be resting on.
+	 */
+	public flush(gamepad: Gamepad, unchange: boolean = false, forceRelease: boolean = false): InputPreprocess {
 		if (!this.info) {
 			return {
 				button: {},
@@ -168,15 +227,19 @@ export default class GamePadExtra {
 		*/
 
 		let thisInput: InputPreprocess = {
-			direction: getDirection(gamepad, this.info!, this.analogThreshold),
+			direction: forceRelease ? this.neutralDirection() : getDirection(gamepad, this.info!, this.analogThreshold),
 			button: {},
 			directionButton: {},
 		};
 
-		const bs = getButtonPress(gamepad, this.info!, true);
+		// The first frame back: whatever is still held was held through the blur.
+		const resumed = this.wasForceReleased && !forceRelease;
+		this.wasForceReleased = forceRelease;
+
+		const bs: (boolean | null)[] = forceRelease ? [] : getButtonPress(gamepad, this.info!, true);
 		for (let k in this.btn_names) {
 			if (this.btn_names[k] && this.buttons[this.btn_names[k]!]) {
-				const press = bs[k] === true;
+				const press = this.holdBlock(this.btn_names[k]!, bs[k] === true, resumed);
 				const lastPress = this.unchangeCache[k] ?? 0;
 				this.unchangeCache[k] = press ? (this.unchangeCache[k] ? this.unchangeCache[k] + 1 : 1) : 0;
 				if (unchange) {
@@ -190,7 +253,7 @@ export default class GamePadExtra {
 					};
 					continue;
 				}
-				if (bs[k]) {
+				if (press) {
 					this.buttons[this.btn_names[k]!].press();
 				} else {
 					this.buttons[this.btn_names[k]!].release();
@@ -200,7 +263,7 @@ export default class GamePadExtra {
 		}
 
 		for (let k in this.directionButton) {
-			let kk: dpad = k as dpad;
+			let kk: Dpad = k as Dpad;
 			let press: boolean = false;
 			if (thisInput.direction!.dpad && thisInput.direction!.dpad![kk]) {
 				press = true;
@@ -208,6 +271,7 @@ export default class GamePadExtra {
 				press = true;
 			}
 			//|| (thisInput.direction!.leftAnalog?[kk]??false);
+			press = this.holdBlock(kk, press, resumed);
 			const lastPress = this.unchangeCache[kk] ?? 0;
 			this.unchangeCache[kk] = press ? (this.unchangeCache[kk] ? this.unchangeCache[kk] + 1 : 1) : 0;
 			if (unchange) {
@@ -252,7 +316,7 @@ export default class GamePadExtra {
 			});
 		} else if (this.lastGamepad.hapticActuators) {
 			let re: Promise<GamepadHapticsResult> | undefined;
-			console.log(this.lastGamepad, this.lastGamepad.hapticActuators);
+			debugLog(this.lastGamepad, this.lastGamepad.hapticActuators);
 			for (const h of this.lastGamepad.hapticActuators) {
 				//h.pulse(duration, strongMagnitude);
 				re = h.playEffect("dual-rumble", {

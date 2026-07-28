@@ -1,4 +1,5 @@
-//
+import { debugLog } from "../utils/debug";
+
 const XflipList: Record<string, number> = {
 	"1": 3,
 	"3": 1,
@@ -173,7 +174,7 @@ export function str2Command(str: string): fightingInputCommand | undefined {
 		} else if (buttons.includes("/")) {
 			buttons = buttons.split("/");
 		}
-		console.log({
+		debugLog({
 			directions,
 			buttons,
 			needAllbuttons,

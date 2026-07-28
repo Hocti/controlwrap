@@ -1,4 +1,4 @@
-import { dpad, dpadPress, getDpadDirection, xy } from "gamepad_standardizer";
+import { Dpad, DpadPress, getDpadDirection, XY } from "gamepad_standardizer";
 import {
 	ButtonState,
 	mappingGroup,
@@ -21,8 +21,17 @@ import {
 
 const MAX_KEYBOARD = 4;
 const F_ALL: string[] = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
-const ignoreKeys: string[] = ["Escape", "MetaLeft", "MetaRight", "PrintScreen", "NumLock", ...F_ALL];
+// Keys no game may bind at all: the OS or the browser owns them, so a mapping would never
+// fire reliably. Checked by checkMapping().
+const ignoreKeys: string[] = ["Escape", "MetaLeft", "MetaRight", "PrintScreen", "NumLock"];
+// Keys whose browser default is suppressed (F1 help, F5 reload, F11 fullscreen, Tab focus).
+// They are still recorded as buttons, so a game that binds them does receive the press.
 const ignoreFunction: string[] = ["Escape", "MetaLeft", "MetaRight", "Tab", ...F_ALL];
+// Keys the *rebind UI* must not capture: someone hitting F5 means "reload", not "assign this
+// key to jump". A game may still hard-code an F-key as a fixed default mapping — that is a
+// deliberate choice by the game, not something a player fell into. Deliberately wider than
+// ignoreKeys; keep the two apart.
+const unlistenableKeys: string[] = [...ignoreKeys, ...F_ALL];
 //'ContextMenu','OSLeft','OSRight','BrowserBack','BrowserForward','BrowserRefresh','BrowserStop','BrowserSearch','BrowserFavorites','BrowserHome','VolumeMute','VolumeDown','VolumeUp','MediaTrackNext','MediaTrackPrevious','MediaStop','MediaPlayPause'];
 
 const defaultKBEventToKey = (event: KeyboardEvent) => {
@@ -57,7 +66,38 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 	private buttons: Record<string, Button> = {};
 	private inited: boolean = false;
 
-	public allowNonStructedSystemKey: Boolean = false;
+	/**
+	 * When true (default) the arrow keys and Enter are *preserved* as global keyboard
+	 * UI-navigation keys: they always feed the system input (menu up/down/left/right/confirm)
+	 * AND cannot be remapped to any keyboard other than keyboard 0. Set it false to release
+	 * them so they can be bound to any player (e.g. an arrow-keys player on keyboard 2); they
+	 * then stop acting as global nav keys and menu navigation follows each player's own mapping.
+	 *
+	 * Escape is ALWAYS preserved regardless of this flag — it is the structural system key and
+	 * can never be remapped or disabled.
+	 */
+	public preserveNavKeys: boolean = true;
+
+	/**
+	 * True while the app is in {@link UIInputMode.single} — one person driving a menu. The fixed
+	 * menu keys are live then *whatever* `preserveNavKeys` says, because the two flags answer
+	 * different questions: `preserveNavKeys` decides whether a player may **bind** the arrows and
+	 * Enter for themselves, this one decides whether those keys **drive a menu**. Releasing the
+	 * arrows so keyboard 3 can play with them never meant "menus no longer respond to arrows" —
+	 * that was one flag doing two jobs, and it left a game with no keyboard menu keys at all.
+	 *
+	 * Set by ControlWrap when the mode changes; not meant to be written directly.
+	 */
+	public singleUserUI: boolean = true;
+
+	/** @deprecated confusing inverse name — use {@link preserveNavKeys} instead. */
+	public get allowNonStructedSystemKey(): boolean {
+		return !this.preserveNavKeys;
+	}
+	public set allowNonStructedSystemKey(v: boolean) {
+		this.preserveNavKeys = !v;
+	}
+
 	public customStopEventFn: ((event: KeyboardEvent) => boolean) | undefined;
 
 	public get downKeyArray() {
@@ -66,48 +106,71 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
 	public kbEventToKey: (event: KeyboardEvent) => string = defaultKBEventToKey;
 
+	// bound listeners kept so dispose() can remove exactly what init() added
+	private _boundKeyDown = this.onKeyDown.bind(this);
+	private _boundKeyUp = this.onKeyUp.bind(this);
+	private _boundBlur = this.onBlur.bind(this);
+
 	public init() {
 		if (this.inited) {
 			return;
 		}
 		this.inited = true;
-		window.addEventListener("keydown", (event: KeyboardEvent) => {
-			const keyCode = this.kbEventToKey(event);
-			if (keyCode && !event.repeat) {
-				if (this.customStopEventFn ? this.customStopEventFn(event) : ignoreFunction.indexOf(keyCode) >= 0) {
-					stopEvent(event);
-				}
-				this.listenDown(keyCode);
-				this.downKey.add(keyCode);
-				this.downKey2.add(keyCode);
-				if (!this.buttons[keyCode]) {
-					this.buttons[keyCode] = new Button();
-				}
-				this.buttons[keyCode].press();
-			}
-		});
-
-		window.addEventListener("keyup", (event: KeyboardEvent) => {
-			const keyCode = this.kbEventToKey(event);
-			if (keyCode) {
-				this.downKey.delete(keyCode);
-				this.downKey2.delete(keyCode);
-				if (!this.buttons[keyCode]) {
-					this.buttons[keyCode] = new Button();
-				}
-				this.buttons[keyCode].release();
-			}
-		});
-
-		window.addEventListener("blur", (event: Event) => {
-			for (let keyCode in this.buttons) {
-				this.buttons[keyCode].release();
-			}
-			this.downKey.clear();
-			this.downKey2.clear();
-		});
+		window.addEventListener("keydown", this._boundKeyDown);
+		window.addEventListener("keyup", this._boundKeyUp);
+		window.addEventListener("blur", this._boundBlur);
 
 		this.totalKeyboard = 1;
+	}
+
+	public dispose(): void {
+		if (!this.inited) return;
+		window.removeEventListener("keydown", this._boundKeyDown);
+		window.removeEventListener("keyup", this._boundKeyUp);
+		window.removeEventListener("blur", this._boundBlur);
+		this.inited = false;
+	}
+
+	private onKeyDown(event: KeyboardEvent): void {
+		const keyCode = this.kbEventToKey(event);
+		if (keyCode && !event.repeat) {
+			if (this.customStopEventFn ? this.customStopEventFn(event) : ignoreFunction.indexOf(keyCode) >= 0) {
+				stopEvent(event);
+			}
+			// A press consumed by a listen is spent: it does not also reach the game on the next
+			// flush. Keyboard listening is answered here, on the DOM event — a frame or more
+			// before anything reads the input — so without this the press did both jobs. The
+			// Escape that cancelled a rebind went on to close the panel the rebind was in (and,
+			// held, the panel under that); the key you assigned to "jump" also fired whatever it
+			// had been bound to a moment earlier.
+			if (this.listenDown(keyCode)) return;
+			this.downKey.add(keyCode);
+			this.downKey2.add(keyCode);
+			if (!this.buttons[keyCode]) {
+				this.buttons[keyCode] = new Button();
+			}
+			this.buttons[keyCode].press();
+		}
+	}
+
+	private onKeyUp(event: KeyboardEvent): void {
+		const keyCode = this.kbEventToKey(event);
+		if (keyCode) {
+			this.downKey.delete(keyCode);
+			this.downKey2.delete(keyCode);
+			if (!this.buttons[keyCode]) {
+				this.buttons[keyCode] = new Button();
+			}
+			this.buttons[keyCode].release();
+		}
+	}
+
+	private onBlur(_event: Event): void {
+		for (let keyCode in this.buttons) {
+			this.buttons[keyCode].release();
+		}
+		this.downKey.clear();
+		this.downKey2.clear();
 	}
 
 	public importRequirement(requirement: mappingRequirement): void {
@@ -157,7 +220,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		const ui_tap: string[] = [];
 		const ui_pressing: string[] = [];
 		const ui_repeat: string[] = [];
-		const dpadPressed: dpadPress = {
+		const dpadPressed: DpadPress = {
 			up: false,
 			down: false,
 			left: false,
@@ -169,8 +232,9 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		let doublePressDirection = false;
 		let ui_dpad_just: string = "";
 
-		for (const keyName in this.currentMapping[id]) {
-			const buttonName = this.currentMapping[id][keyName];
+		// currentMapping[id] maps buttonName (action) → keyCode(s); keyStatus is keyed by keyCode. (B16 fix: names were reversed)
+		for (const buttonName in this.currentMapping[id]) {
+			const keyCodes = this.currentMapping[id][buttonName];
 			let status: ButtonState = {
 				press: false,
 				just: false,
@@ -178,37 +242,37 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 				tap: false,
 				pressFrame: 0,
 			};
-			if (typeof buttonName === "string") {
-				if (keyStatus[buttonName]) {
-					status = keyStatus[buttonName];
+			if (typeof keyCodes === "string") {
+				if (keyStatus[keyCodes]) {
+					status = keyStatus[keyCodes];
 				}
 			} else {
-				for (let i = 0; i < buttonName.length; i++) {
-					if (keyStatus[buttonName[i]]) {
-						status = joinState(status, keyStatus[buttonName[i]]);
+				for (let i = 0; i < keyCodes.length; i++) {
+					if (keyStatus[keyCodes[i]]) {
+						status = joinState(status, keyStatus[keyCodes[i]]);
 					}
 				}
 			}
 
-			if (keyName === "double") {
+			if (buttonName === "double") {
 				doublePress = status.press;
 				justDouble = status.just;
 				continue;
 			}
 
 			//is dpad
-			if (inEnum(keyName, dpad)) {
-				dpadPressed[keyName as dpad] = status !== undefined && (status.press || status.tap);
-				directionButton[keyName] = status;
+			if (inEnum(buttonName, Dpad)) {
+				dpadPressed[buttonName as Dpad] = status !== undefined && (status.press || status.tap);
+				directionButton[buttonName] = status;
 
 				if ((status.press && status.just) || status.tap) {
-					ui_dpad_just = keyName;
+					ui_dpad_just = buttonName;
 				}
 				if (status.press) {
-					ui_pressing.push(keyName);
+					ui_pressing.push(buttonName);
 				}
 				if (isRepeat(status)) {
-					ui_repeat.push(keyName);
+					ui_repeat.push(buttonName);
 				}
 
 				doublePressDirection = doublePressDirection || status.double;
@@ -217,11 +281,11 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
 			//other ui button
 			if (
-				this.requirement!.button.indexOf(keyName) >= 0 ||
-				(this.requirement!.optional && this.requirement!.optional.indexOf(keyName) >= 0)
+				this.requirement!.button.indexOf(buttonName) >= 0 ||
+				(this.requirement!.optional && this.requirement!.optional.indexOf(buttonName) >= 0)
 			) {
-				button[keyName] = status;
-				const ui_btn_name = findKeyByValue(this.requirement!.ui_pair, keyName);
+				button[buttonName] = status;
+				const ui_btn_name = findKeyByValue(this.requirement!.ui_pair, buttonName);
 				if (ui_btn_name) {
 					if ((status.press && status.just) || status.tap) {
 						ui_tap.push(ui_btn_name);
@@ -235,17 +299,17 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 				}
 			} else if (
 				status &&
-				((this.requirement!.ui_button && this.requirement!.ui_button.indexOf(keyName) >= 0) ||
-					(this.requirement!.ui_optional && this.requirement!.ui_optional.indexOf(keyName) >= 0))
+				((this.requirement!.ui_button && this.requirement!.ui_button.indexOf(buttonName) >= 0) ||
+					(this.requirement!.ui_optional && this.requirement!.ui_optional.indexOf(buttonName) >= 0))
 			) {
 				if ((status.press && status.just) || status.tap) {
-					ui_tap.push(keyName);
+					ui_tap.push(buttonName);
 				}
 				if (status.press) {
-					ui_pressing.push(keyName);
+					ui_pressing.push(buttonName);
 				}
 				if (isRepeat(status)) {
-					ui_repeat.push(keyName);
+					ui_repeat.push(buttonName);
 				}
 			}
 		}
@@ -259,7 +323,6 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		if (dpadResult.numpad % 2 == 0 && ui_dpad_just != "") {
 			ui_tap.push(ui_dpad_just);
 		}
-		//console.log(button,ui_tap,dpadResult.numpad,directionState);//);
 
 		//double
 		if (doublePress) {
@@ -291,9 +354,9 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 			ui_pressing,
 			ui_repeat,
 
-			mixedDpad: dpadResult as dpadPress & { numpad: number } & xy,
+			mixedDpad: dpadResult as DpadPress & { numpad: number } & XY,
 			doublePressDirection,
-			directionButton: directionButton as Record<dpad, ButtonState>,
+			directionButton: directionButton as Record<Dpad, ButtonState>,
 
 			button,
 
@@ -303,14 +366,15 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 
 	protected getSystemInput(keyStatus: Record<string, ButtonState>): Input {
 		const sdf: Record<string, ButtonState> = {};
-		if (this.allowNonStructedSystemKey) {
-			for (let keyName in KEYBOARD_HARDCODE_UI_BUTTON_STRUCT) {
-				sdf[keyName] = keyStatus[KEYBOARD_HARDCODE_UI_BUTTON_STRUCT[keyName]];
-			}
-		} else {
-			for (let keyName in KEYBOARD_HARDCODE_UI_BUTTON) {
-				sdf[keyName] = keyStatus[KEYBOARD_HARDCODE_UI_BUTTON[keyName]];
-			}
+		// Escape (STRUCT) is always a system key. The rest — arrows, Enter, Backspace, Tab — are
+		// system keys whenever one person is driving the UI (see singleUserUI), and additionally
+		// whenever they are reserved from player mappings altogether (preserveNavKeys).
+		const navKeys =
+			this.preserveNavKeys || this.singleUserUI
+				? KEYBOARD_HARDCODE_UI_BUTTON
+				: KEYBOARD_HARDCODE_UI_BUTTON_STRUCT;
+		for (let keyName in navKeys) {
+			sdf[keyName] = keyStatus[navKeys[keyName]];
 		}
 		const ui_tap: string[] = [];
 		const ui_pressing: string[] = [];
@@ -402,18 +466,25 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		const keys2 = [...keys];
 		for (let k in this.requirement!.ui_pair) {
 			if (keys.indexOf(k) >= 0) {
-				//console.log('listenControllerIndexFromKeys',k,this.requirement!.ui_pair[k]);
 				keys2.push(this.requirement!.ui_pair[k]);
 			}
 		}
 		return super.listenControllerIndexFromKeys(keys2);
 	}
 
-	private listenDown(keyCode: string) {
+	/**
+	 * Offer a key press to whatever is listening.
+	 *
+	 * @returns true when the listen took the press — the caller must then drop it, so the one
+	 * press does one thing. Escape only counts as taken when a listen was really cancelled by
+	 * it; with nothing listening it is an ordinary system key and must reach the game.
+	 */
+	private listenDown(keyCode: string): boolean {
 		if (keyCode === "Escape") {
 			this.emit("escape");
 			if (this.listenMode !== listenStatus.none) {
 				this.cancelListen("escape");
+				return true;
 			}
 		} else if (this.listenMode === listenStatus.ControllerIndexFromKeys) {
 			for (let i = 0; i < this.totalKeyboard; i++) {
@@ -424,15 +495,16 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 					) {
 						this.listenMode = listenStatus.none;
 						this.emit("listenControllerIndexFromKeys", i);
-						return;
+						return true;
 					}
 				}
 			}
-		} else if (this.listenMode === listenStatus.anyKey && ignoreKeys.indexOf(keyCode) === -1) {
+		} else if (this.listenMode === listenStatus.anyKey && unlistenableKeys.indexOf(keyCode) === -1) {
 			this.listenMode = listenStatus.none;
 			this.emit("listenKeyFromControllerIndex", keyCode);
-			return;
+			return true;
 		}
+		return false;
 	}
 
 	public listenKeyFromControllerIndex(): Promise<number> {
@@ -490,20 +562,11 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		if (ignoreKeys.indexOf(keyCode) !== -1) return false;
 		if (buttonName === "escape") return false;
 
-		if (this.allowNonStructedSystemKey) {
-			if (
-				Object.values(KEYBOARD_HARDCODE_UI_BUTTON_STRUCT).includes(keyCode) &&
-				(KEYBOARD_HARDCODE_UI_BUTTON_STRUCT[buttonName] !== keyCode || id != 0)
-			) {
-				return false;
-			}
-		} else {
-			if (
-				Object.values(KEYBOARD_HARDCODE_UI_BUTTON).includes(keyCode) &&
-				(KEYBOARD_HARDCODE_UI_BUTTON[buttonName] !== keyCode || id != 0)
-			) {
-				return false;
-			}
+		// Reserved system keys can't be remapped (except keyboard 0 keeping its own default).
+		// Escape (STRUCT) is always reserved; arrows/Enter are reserved only while preserved.
+		const reserved = this.preserveNavKeys ? KEYBOARD_HARDCODE_UI_BUTTON : KEYBOARD_HARDCODE_UI_BUTTON_STRUCT;
+		if (Object.values(reserved).includes(keyCode) && (reserved[buttonName] !== keyCode || id != 0)) {
+			return false;
 		}
 
 		return true;
@@ -582,7 +645,7 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		for (let i = 0; i < num; i++) {
 			if (!this.currentMapping[i]) {
 				this.currentMapping[i] = {};
-				Object.keys(dpad).forEach((keyName, index) => {
+				Object.keys(Dpad).forEach((keyName, index) => {
 					this.currentMapping[i][keyName] = "";
 				});
 				this.requirement!.button.forEach((keyName, index) => {
@@ -605,7 +668,6 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 				}
 				//
 				this.resetDefault(i);
-				//console.log('setPlayerCountFromKeyboard',i,this.currentMapping[i],this.defaultMapping[i])
 			}
 		}
 	}

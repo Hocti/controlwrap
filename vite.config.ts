@@ -1,7 +1,9 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import dts from 'vite-plugin-dts';
-import repo from "./package.json" assert { type: 'json' };
+import { vitestBase } from '@mono/configs/vitest.base';
+import repo from "./package.json" with { type: 'json' };
 
 const compiled = (new Date()).toUTCString().replace(/GMT/g, "UTC");
 const banner = `/*!
@@ -13,13 +15,18 @@ const banner = `/*!
  * http://www.opensource.org/licenses/mit-license
  */`;
 
-export default defineConfig(({ command }) => {
+export default defineConfig(({ command, mode }) => {
+  if (mode === 'test' || process.env.VITEST) {
+    return { test: vitestBase };
+  }
+
   if (command === 'build') {
     return {
       plugins: [
         dts({
           include: ['src/**/*.ts'],
-          rollupTypes: true
+          rollupTypes: true,
+          bundledPackages: ['gamepad_standardizer']
         })
       ],
       build: {
@@ -46,7 +53,7 @@ export default defineConfig(({ command }) => {
 
   return {
     root: 'demo',
-    server: { https: true, port: 5175 },
+    server: { https: {}, port: 5175 },
     plugins: [basicSsl()],
     optimizeDeps: {
       exclude: ['gamepad_standardizer', 'controlwrap']

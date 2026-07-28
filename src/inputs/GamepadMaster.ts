@@ -1,7 +1,7 @@
 import { EventEmitter } from "eventemitter3";
 
 //import * as gamepad_standardizer from "gamepad_standardizer"
-import { dpad, DP_BUTTON_NAME, getDpadDirection, xy } from "gamepad_standardizer";
+import { Dpad, DP_BUTTON_NAME, getDpadDirection, XY } from "gamepad_standardizer";
 import {
 	ButtonState,
 	mappingGroup,
@@ -19,6 +19,8 @@ import { IControllerMaster } from "./IControllerMaster";
 import GamePadExtra, { InputPreprocess } from "./GamePadExtra";
 import KeyboardMaster from "./KeyboardMaster";
 import { buttonLayout } from "../config";
+import { getPairFromBtnName, getPairFromUiBtnName } from "./uiPairing";
+import { isWindowActive } from "../utils/windowActive";
 
 const unchangeable = ["start", ...DP_BUTTON_NAME];
 
@@ -69,6 +71,30 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 	private inited: boolean = false;
 	private gamePads: (GamePadExtra | undefined)[] = [];
 
+	/**
+	 * Ignore every gamepad while the window does not have focus (default true).
+	 *
+	 * The keyboard gets this for free — a blurred window is sent no key events — but a gamepad is
+	 * *polled*, so without this a pad resting against something (or a player using another window)
+	 * keeps driving a game nobody is looking at. Pads are still tracked and connect/disconnect
+	 * still fires; only the input is read as "nothing pressed", so a button held across the blur
+	 * releases rather than sticking, and rebind listening cannot capture a background press.
+	 *
+	 * Set false when the window being focused is not the question — an overlay, a kiosk, a
+	 * second display, or anything driven while the player is looking elsewhere.
+	 */
+	public ignoreWhenWindowInactive: boolean = true;
+
+	/** True when input should be read as "nothing pressed" this frame. */
+	private get suppressed(): boolean {
+		return this.ignoreWhenWindowInactive && !isWindowActive();
+	}
+
+	// bound listeners kept so dispose() can remove exactly what init() added
+	private _boundAddGP = this.addGP.bind(this);
+	private _boundRemoveGP = this.removeGP.bind(this);
+	private _boundSystemEscape = this.systemEscape.bind(this);
+
 	public count(): number {
 		let counter = 0;
 		const gps = navigator.getGamepads();
@@ -96,11 +122,18 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 			return;
 		}
 		this.inited = true;
-		window.addEventListener("gamepadconnected", this.addGP.bind(this));
-		window.addEventListener("gamepaddisconnected", this.removeGP.bind(this));
-		window.addEventListener("gamepadconnected", this.addGP.bind(this));
+		window.addEventListener("gamepadconnected", this._boundAddGP);
+		window.addEventListener("gamepaddisconnected", this._boundRemoveGP);
 
-		KeyboardMaster.getInstance().addListener("escape", this.systemEscape.bind(this));
+		KeyboardMaster.getInstance().addListener("escape", this._boundSystemEscape);
+	}
+
+	public dispose(): void {
+		if (!this.inited) return;
+		window.removeEventListener("gamepadconnected", this._boundAddGP);
+		window.removeEventListener("gamepaddisconnected", this._boundRemoveGP);
+		KeyboardMaster.getInstance().removeListener("escape", this._boundSystemEscape);
+		this.inited = false;
 	}
 
 	public getGamepadExtra(index: number): GamePadExtra | undefined {
@@ -153,11 +186,19 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 	private flushInner(uiOnly: boolean = false): Record<number, Input> {
 		const result: Record<number, Input> = {};
 		const gps = navigator.getGamepads();
+		// Read once per flush, not per pad: every pad must agree on whether this frame counts.
+		const suppressed = this.suppressed;
 		for (let i = 0, t = gps.length; i < t; i++) {
 			if (this.gamePads[i] === undefined) {
 				continue;
 			}
-			const inputResult = this.gamePads[i]!.flush(gps[i]!, uiOnly);
+			const inputResult = this.gamePads[i]!.flush(gps[i]!, uiOnly, suppressed);
+			// A rebind must not be answered by a window the player is not looking at — the press
+			// that assigns a button belongs to whoever has focus.
+			if (suppressed) {
+				result[i] = this.processInput(i, inputResult, uiOnly);
+				continue;
+			}
 			if (this.listenMode === listenStatus.raw && this.listeningIndex === i) {
 				this.processRaw(gps[i]!);
 			} else if (this.listenMode !== listenStatus.none) {
@@ -168,46 +209,12 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 		return result;
 	}
 
-	private getPairFromBtnName(btnName: string, swapAB: boolean = false): string {
-		if (btnName == "a") {
-			return !swapAB ? "confirm" : "cancel";
-		} else if (btnName == "b") {
-			return !swapAB ? "cancel" : "confirm";
-		} else if (btnName == "start") {
-			return "escape";
-		} else if (btnName == "back") {
-			return "info";
-		} else if (btnName == "leftshoulder") {
-			return "prevTab";
-		} else if (btnName == "rightshoulder") {
-			return "nextTab";
-		}
-		return "";
-	}
-
-	private getPairFromUiBtnName(UiBtnName: string, swapAB: boolean = false): string {
-		if (UiBtnName == "confirm") {
-			return !swapAB ? "a" : "b";
-		} else if (UiBtnName == "cancel") {
-			return swapAB ? "a" : "b";
-		} else if (UiBtnName == "escape") {
-			return "start";
-		} else if (UiBtnName == "info") {
-			return "back";
-		} else if (UiBtnName == "prevTab") {
-			return "leftshoulder";
-		} else if (UiBtnName == "nextTab") {
-			return "rightshoulder";
-		}
-		return "";
-	}
-
 	public renewSystemButtonLayout(index: number): latestLayoutGroup {
 		const mapping: mappingGroup = { ...this.currentMapping[index] };
 
 		for (let uikeyName in AllUIButton) {
-			if (inEnum(uikeyName, dpad)) continue;
-			mapping[uikeyName] = this.getPairFromUiBtnName(uikeyName, this.gamePads[index]!.swapAB);
+			if (inEnum(uikeyName, Dpad)) continue;
+			mapping[uikeyName] = getPairFromUiBtnName(uikeyName, this.gamePads[index]!.swapAB);
 		}
 
 		return {
@@ -228,7 +235,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 		//ui button
 		for (let btnName in inputResult.button) {
 			//button[btnName]=inputResult.button[btnName];
-			const uiBtnName = this.getPairFromBtnName(btnName, this.gamePads[index]!.swapAB);
+			const uiBtnName = getPairFromBtnName(btnName, this.gamePads[index]!.swapAB);
 
 			if (uiBtnName != "") {
 				if (getUITap(inputResult.button[btnName])) {
@@ -497,7 +504,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 
 				//ui button name (confirm,escape)
 				for (let uikeyName in AllUIButton) {
-					const btnName = this.getPairFromUiBtnName(uikeyName, this.gamePads[index]!.swapAB);
+					const btnName = getPairFromUiBtnName(uikeyName, this.gamePads[index]!.swapAB);
 					if (
 						this.listenKeys.indexOf(uikeyName) >= 0 &&
 						(getUITap(inputResult.button[btnName]) || getUITap(inputResult.directionButton[uikeyName]))
@@ -566,7 +573,6 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 				const btnName = this.requirement.ui_button[i];
 				if (btnName in AllUIButton) {
 					delete this.requirement.ui_button[i];
-					//console.log(`ui_tap ${btnName} is reserved`);
 				}
 			}
 		}
@@ -575,7 +581,6 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 				const btnName = this.requirement.ui_optional[i];
 				if (btnName in AllUIButton) {
 					delete this.requirement.ui_optional[i];
-					//console.log(`ui_optional ${btnName} is reserved`);
 				}
 			}
 		}
@@ -585,7 +590,6 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
             for(const btnName in this.requirement.ui_pair){
                 if(btnName in AllUIButton){
                     delete this.requirement.ui_pair[btnName]
-                    //console.log(`ui_pair ${btnName} is reserved`);
                 }
             }
             */

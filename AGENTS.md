@@ -29,10 +29,15 @@ One number identifies every controller in the whole system.
 |---|---|
 | `0`–`3` | keyboard players 1–4 |
 | `100`–`103` | gamepad slots 1–4 |
+| `200` | virtual (touch) pads |
 | `1000` | system keyboard (arrows / Enter / Esc) |
 | `2000` | UI bucket (system + main player mixed) |
 
 Helpers: `cwi.parseIndex(n)` → `[ControlType, localIndex]`, `cwi.makeIndex(type, localIndex)` → number.
+Prefer the `ControllerId` constants (`ControllerId.GAMEPAD_1`, `.isVirtual(n)`, …) over raw
+numbers. `GAMEPAD_INDEX_OFFSET` is the correct spelling of the offset (old `GAMPEPAD_INDEX_OFFSET`
+is a deprecated alias). `cwi.getDeviceInfo(n)` → `{ device: 'vendor:product'|'keyboard'|'virtual',
+xinput }` (used by ProfileMapping).
 
 ## Setup (typical)
 
@@ -239,6 +244,32 @@ Numpad notation: `1=down-back 2=down 3=down-forward 4=back 5=neutral 6=forward 7
 - `cwi.getGamepadExtra(index)` — raw gamepad info (buttons/axes/hat).
 - `buttonLayout` enum — `xbox | sony | nintendo | unknown | keyboard` — used to pick icons.
 - Event `cwi.on("changeLastInputIndex", ({ index, buttonLayout }) => ...)` — fires when the active controller changes.
+- `cwi.dispose()` — remove all window listeners and reset the singleton (each master also has `dispose()`).
+- `setDebug(true)` — enable internal debug logging; nothing logs otherwise.
+
+## Virtual gamepad (touch input, zero UI)
+
+`VirtualGamepadMaster` is an input **injection point** for touch UIs — it has **no DOM/UI code**.
+Enable it with `wrappedInit({ ..., virtual: true })` (inits + `connect(0)`, sharing the gamepad
+default mapping). Your touch UI then calls, on `VirtualGamepadMaster.getInstance()`:
+
+- `setButton(name, pressed, index?)` — `name` is a standard pad button (`a`/`b`/`x`/`y`/shoulders/triggers/`back`/`start`).
+- `setDirection(x, y, index?)` — left-analog semantics (`getAnalogDirection`).
+- `setDpad(dir, pressed, index?)` — inject a dpad direction directly.
+- `releaseAll(index?)` — call when the UI hides, to avoid stuck keys.
+
+The game reads input normally from `cwi.update()`; it never needs to know a virtual pad exists.
+UI pairing is fixed xbox layout (`a→confirm`, `start→escape`, …), never swapAB.
+
+## Optional utilities (`useful/` — not core)
+
+- **`ProfileMapping`** — named mapping profiles in localStorage. CRUD (`save`/`get`/`list`/`remove`),
+  `availableFor(device, xinput)` (non-xinput → same device only; xinput → all xinput, same-device
+  first), and `captureFrom(cw, id, name)` / `applyTo(cw, id, name)` helpers.
+- **`PlayerIndexMapper`** — Smash-style lobby seats. `join(id)`/`leave(id)`/`setReady(id, ready?)`,
+  `readyToStart` getter + event (emitted on change). Owns seat + ready state only; countdown is
+  the game's job. Old `setBlock`/`setBlockReady`/`removeBlock`/`dispose` are deprecated aliases.
+- `fighterHelper` / `pressHistory` — experimental, untested; unchanged.
 
 ## Common mistakes to avoid
 
@@ -263,16 +294,22 @@ src/
     InputDeviceMaster.ts— shared base class
     KeyboardMaster.ts   — keyboard handling, multi-player split
     GamepadMaster.ts    — gamepad handling (uses gamepad_standardizer)
+    VirtualGamepadMaster.ts — touch input injection point (zero UI)
     GamePadExtra.ts     — raw gamepad info / remapping
     MouseMaster.ts      — mouse handling
     Button.ts           — ButtonState / tap / double-tap / UI repeat
+    uiPairing.ts        — fixed physical↔UI button pairing (shared by gamepad + virtual)
     common.ts           — checkAnyKeypress
+  utils/
+    debug.ts            — setDebug / debugLog (the only console path)
+    utils.ts            — clone / findKeyByValue / inEnum / stopEvent
+    windowActive.ts     — isWindowActive(): does this window have focus (gamepad gating)
   useful/
     InputHelper.ts      — YES/NO/UD/LR/tap/pressing helpers
-    fighterHelper.ts    — fightingInput / str2Command
-    pressHistory.ts     — frame history for commands
-    PlayerIndexMapper.ts— map controller slots → player slots (ready-up lobbies)
-    ProfileMapping.ts   — save/load mapping profiles
+    fighterHelper.ts    — fightingInput / str2Command (experimental)
+    pressHistory.ts     — frame history for commands (experimental)
+    PlayerIndexMapper.ts— Smash-style lobby seats (join/ready/readyToStart)
+    ProfileMapping.ts   — named mapping profiles (localStorage CRUD + device rules)
 demo/
   controlWrap.html      — full demo with remap UI
   fightTest.html        — fighting-command demo

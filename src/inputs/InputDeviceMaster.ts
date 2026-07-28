@@ -29,14 +29,12 @@ export default abstract class InputDeviceMaster extends EventEmitter {
 
 		return new Promise((resolve, reject) => {
 			this.addListener("cancelListen", (e) => {
-				//console.log('cancelListen',e);
 				this.listenMode = listenStatus.none;
 				this.removeAllListeners("cancelListen");
 				this.removeAllListeners("listenControllerIndexFromKeys");
 				reject(e);
 			});
 			this.addListener("listenControllerIndexFromKeys", (i) => {
-				//console.log('listenControllerIndexFromKeys',this,i);
 				this.listenMode = listenStatus.none;
 				this.removeAllListeners("cancelListen");
 				this.removeAllListeners("listenControllerIndexFromKeys");

@@ -1,6 +1,7 @@
 import { EventEmitter } from "eventemitter3";
-import { xy } from "gamepad_standardizer";
+import { XY } from "gamepad_standardizer";
 import { mouseInput } from "../types";
+import { debugLog } from "../utils/debug";
 import { stopEvent } from "../utils/utils";
 import { Button } from "./Button";
 
@@ -24,32 +25,47 @@ export default class MouseMaster extends EventEmitter {
 
 	public customStopEventFn: ((event: MouseEvent) => boolean) | undefined;
 
-	protected lastxy: xy = { x: 0, y: 0 };
-	protected latestxy: xy = { x: 0, y: 0 };
+	protected lastxy: XY = { x: 0, y: 0 };
+	protected latestxy: XY = { x: 0, y: 0 };
 	protected delta: number = 0;
 	protected lastPress: boolean[] = [false, false, false, false, false];
 	private buttons: Record<string, Button> = {};
 	private inited: boolean = false;
+
+	// bound listeners kept so dispose() can remove exactly what init() added
+	private _boundMEvent = this.mEvent.bind(this);
+	private _boundOnBlur = this.onBlur.bind(this);
+	private _boundWEvent = this.wEvent.bind(this);
+	private _boundRightClick = this.onRightClick.bind(this);
 
 	public init() {
 		if (this.inited) {
 			return;
 		}
 		this.inited = true;
-		window.addEventListener("mousemove", this.mEvent.bind(this));
-
-		window.addEventListener("mousedown", this.mEvent.bind(this));
-		window.addEventListener("mouseup", this.mEvent.bind(this));
-		//window.addEventListener("click",this.mEvent.bind(this));
-
-		//window.addEventListener("mouseout", this.mEvent);
-		window.addEventListener("blur", this.onBlur.bind(this));
-		window.addEventListener("wheel", this.wEvent.bind(this));
-		document.oncontextmenu = this.onRightClick.bind(this);
+		window.addEventListener("mousemove", this._boundMEvent);
+		window.addEventListener("mousedown", this._boundMEvent);
+		window.addEventListener("mouseup", this._boundMEvent);
+		window.addEventListener("blur", this._boundOnBlur);
+		window.addEventListener("wheel", this._boundWEvent);
+		document.oncontextmenu = this._boundRightClick;
 
 		for (let i = 0; i < 5; i++) {
 			this.buttons[MOUSE_BUTTON_NAME[i]] = new Button();
 		}
+	}
+
+	public dispose(): void {
+		if (!this.inited) return;
+		window.removeEventListener("mousemove", this._boundMEvent);
+		window.removeEventListener("mousedown", this._boundMEvent);
+		window.removeEventListener("mouseup", this._boundMEvent);
+		window.removeEventListener("blur", this._boundOnBlur);
+		window.removeEventListener("wheel", this._boundWEvent);
+		if (document.oncontextmenu === this._boundRightClick) {
+			document.oncontextmenu = null;
+		}
+		this.inited = false;
 	}
 
 	protected wEvent(event: WheelEvent) {
@@ -64,13 +80,6 @@ export default class MouseMaster extends EventEmitter {
 			this.latestxy.y = event.clientY;
 			return;
 		}
-
-		/*
-		console.log(`${event.type}: 
-		${event.clientY}, ${event.pageY}, ${event.offsetY  }, ${event.screenY }, 
-		${event.buttons.toString(2)},${event.button}`);
-		//stopEvent(e);
-		*/
 
 		if (event.type === "mousedown" || event.type === "mouseup") {
 			const buttonPress: boolean[] = [false, false, false, false, false];

@@ -1,5 +1,5 @@
 import { Input, UIButton, UIButtonOptional, InputSource, InputGroup } from "../types";
-import { xy } from "gamepad_standardizer";
+import { XY } from "gamepad_standardizer";
 
 export function tapOrRepeat(ip: Input, key: string, only: boolean = true): boolean {
 	if (only) {
@@ -45,14 +45,14 @@ export function L1R1(ip: Input): number {
 	return tapOrRepeat(ip, UIButtonOptional.prevTab) ? -1 : tapOrRepeat(ip, UIButtonOptional.nextTab) ? 1 : 0;
 }
 
-export function UDLRpressing(ip: Input): xy {
+export function UDLRpressing(ip: Input): XY {
 	return {
 		x: pressing(ip, UIButton.left) ? -1 : pressing(ip, UIButton.right) ? 1 : 0,
 		y: pressing(ip, UIButton.up) ? -1 : pressing(ip, UIButton.down) ? 1 : 0,
 	};
 }
 
-export function UDLR(ip: Input): xy {
+export function UDLR(ip: Input): XY {
 	return {
 		x: tapOrRepeat(ip, UIButton.left) ? -1 : tapOrRepeat(ip, UIButton.right) ? 1 : 0,
 		y: tapOrRepeat(ip, UIButton.up) ? -1 : tapOrRepeat(ip, UIButton.down) ? 1 : 0,

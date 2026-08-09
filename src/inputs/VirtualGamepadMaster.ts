@@ -402,7 +402,9 @@ export default class VirtualGamepadMaster extends InputDeviceMaster implements I
 	private defaultMapping: mappingGroup = {};
 
 	public setDefaultMapping(mapping: mappingGroup): void {
-		this.defaultMapping = mapping;
+		// A copy — see KeyboardMaster.setDefaultKeyboardMapping. The virtual pad shares the
+		// gamepad's default table, so without this the two masters edited one object between them.
+		this.defaultMapping = clone(mapping);
 	}
 
 	public resetDefault(index: number): mappingGroup | undefined {

@@ -107,6 +107,15 @@ setInterval(() => {
 - `update(false)` (default) — flush everything. Use during gameplay.
 - `update(true)` — only UI input is updated this frame. Game button state freezes. Use this while the game is paused, so the pause menu still reacts to input but the player cannot "store" attacks during the pause.
 
+**`ui_scroll` survives `uiOnly`** — it is on `systemInput`, not `gameInput`. "Scroll the view" is a
+UI action, and the analog readings a UI-only flush drops are the *game's*. Today a gamepad's right
+stick is the only thing that writes it, but it is named for the intent rather than the source: a
+wheel, a touch drag or a pair of keys are the same thing, and a UI reading `analog_right` would
+have needed a branch per device. It ignores `requirement.direction.analog` for the same reason — a
+game that asks for one analog, or none, still has menus worth scrolling. On the shared `ui` channel
+it is the *strongest* deflection among the devices feeding that channel, for the same reason
+`ui_tap` is a union: there is one menu however many pads are in.
+
 ## Input shape
 
 Every player's `Input` is `gameInput & systemInput`:
@@ -127,6 +136,7 @@ sourceIndex?: number
 ui_tap:       string[]    // e.g. ["confirm"]
 ui_pressing:  string[]
 ui_repeat:    string[]    // auto-repeat for menu navigation
+ui_scroll?:   { x, y }    // "scroll the view", -1..1 per axis; undefined = nobody is scrolling
 
 // ButtonState
 { press: boolean; just: boolean; tap: boolean; double: boolean; pressFrame: number }
@@ -186,6 +196,15 @@ cwi.cancelListen("reason")
 ```
 
 Use `listenKeyFromControllerIndex` in a loop over `getMappableKeys(index).buttons` to build a "press each key in turn" remap screen (see `demo/controlWrap.html` for a full example).
+
+**Mappings are copied in and copied out.** `getAllMapping` returns a snapshot, and
+`setAllMapping` / `setDefaultKeyboardMapping` / `setDefaultGamepadMapping` store one — nothing
+here ever adopts the caller's object. It has to be that way: the default tables an app passes to
+`wrappedInit` are module constants it goes on using (and usually registers as factory profiles as
+well), while `setMapping` writes *into* the current mapping. Sharing one object between the two
+meant every rebind silently rewrote the default it was supposed to be resettable to, so
+`resetDefault` restored the mapping the player had just made — i.e. "Reset to default" did nothing,
+in a way that looked like a UI bug and was not.
 
 ## Helper functions
 

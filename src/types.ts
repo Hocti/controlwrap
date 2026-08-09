@@ -100,6 +100,22 @@ export type systemInput = {
 	ui_tap: string[]; //confirm,pause
 	ui_pressing: string[]; //confirm,pause
 	ui_repeat: string[]; //confirm,pause
+
+	/**
+	 * "Scroll the view", as an analog amount per axis (-1…1, deadzone already applied).
+	 *
+	 * A *UI* input, deliberately named for what it means rather than where it came from: today
+	 * a gamepad's right stick is the only thing that writes it, but a wheel, a touch drag or a
+	 * pair of keys are the same intent, and a UI reading `analog_right` would have had to grow a
+	 * branch for each. It is on `systemInput` so it survives a `update(true)` UI-only flush,
+	 * where every other analog reading is dropped, and it does not consult
+	 * `requirement.direction.analog`: a game that asks for one analog, or none, still has menus
+	 * worth scrolling.
+	 *
+	 * Undefined when nothing is pushing. On the shared `ui` channel it is the strongest
+	 * deflection among the devices feeding that channel — one menu, however many pads are in.
+	 */
+	ui_scroll?: XY;
 };
 export type Input = systemInput & gameInput;
 

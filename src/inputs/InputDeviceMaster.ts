@@ -1,5 +1,6 @@
 import { EventEmitter } from "eventemitter3";
 import { mappingGroup, mappingRequirement } from "../types";
+import { clone } from "../utils/utils";
 import { IControllerMaster } from "./IControllerMaster";
 
 export enum listenStatus {
@@ -50,8 +51,16 @@ export default abstract class InputDeviceMaster extends EventEmitter {
 
 	//mapping================================================================
 
+	/**
+	 * A **copy** of the controller's current mapping.
+	 *
+	 * It has to be a copy. The stored mapping is handed around freely — a settings panel reads it
+	 * every render, `ProfileMapping.captureFrom` puts it straight into a profile it saves — and
+	 * `setMapping` writes into the live object, so a caller that kept the returned reference would
+	 * watch its "snapshot" change under it on the next rebind.
+	 */
 	public getAllMapping(id: number): mappingGroup {
-		return this.currentMapping[id];
+		return this.currentMapping[id] ? clone(this.currentMapping[id]) : this.currentMapping[id];
 	}
 
 	public abstract checkMapping(id: number, buttonName: string, keyCode: string): boolean;
@@ -70,7 +79,13 @@ export default abstract class InputDeviceMaster extends EventEmitter {
 				}
 			}
 		}
-		this.currentMapping[id] = mapping;
+		// Cloned, never adopted. Every caller of this passes an object it keeps using afterwards:
+		// the boot-time default tables (which `resetDefault` must be able to restore *from*), a
+		// profile freshly parsed out of localStorage, the game's own constant. Storing the
+		// reference made `setMapping` — which writes into `currentMapping[id]` — edit the caller's
+		// object too, so rebinding one key quietly rewrote the default it was supposed to be
+		// resettable to, and "reset to default" became a no-op.
+		this.currentMapping[id] = clone(mapping);
 	}
 
 	public setMapping(id: number, buttonName: string, keyCode: string): boolean {

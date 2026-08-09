@@ -9,6 +9,7 @@ import {
 	mappingRequirement,
 	InputSource,
 	UIInputMode,
+	XY,
 } from "../types";
 
 import { IControllerMaster } from "./IControllerMaster";
@@ -27,6 +28,13 @@ import {
 import { checkAnyKeypress } from "./common";
 import MouseMaster from "./MouseMaster";
 import { debugLog } from "../utils/debug";
+
+/** Whichever of two scroll readings is being pushed further — see `systemInput.ui_scroll`. */
+function strongerScroll(a: XY | undefined, b: XY | undefined): XY | undefined {
+	if (!a) return b;
+	if (!b) return a;
+	return b.x * b.x + b.y * b.y > a.x * a.x + a.y * a.y ? b : a;
+}
 
 export default class ControlWrap extends EventEmitter implements IControllerMaster {
 	protected static instance: ControlWrap;
@@ -291,6 +299,10 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 		let ui_tap_set = new Set<string>();
 		let ui_repeat_set = new Set<string>();
 		let ui_pressing_set = new Set<string>();
+		// "Scroll the view" from whichever UI-feeding device is pushing hardest this frame. Like
+		// the button sets above it has to be *one* value however many pads are plugged in, so the
+		// strongest deflection wins rather than the last device iterated.
+		let ui_scroll: XY | undefined;
 
 		for (const controlType of Object.values(ControlType)) {
 			if (ControlWrap.masterRecord[controlType] && this.listening[controlType]) {
@@ -320,6 +332,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 						re[index].ui_tap.forEach((item) => ui_tap_set.add(item));
 						re[index].ui_repeat.forEach((item) => ui_repeat_set.add(item));
 						re[index].ui_pressing.forEach((item) => ui_pressing_set.add(item));
+						ui_scroll = strongerScroll(ui_scroll, re[index].ui_scroll);
 					}
 				}
 			}
@@ -336,6 +349,7 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 			ui_tap: [...ui_tap_set],
 			ui_pressing: [...ui_pressing_set],
 			ui_repeat: [...ui_repeat_set],
+			ui_scroll,
 		};
 		result[UI_INDEX_OFFSET] = { ...aggregate };
 		// System channel = the single main-user's aggregated UI actions (keyboard hardcoded

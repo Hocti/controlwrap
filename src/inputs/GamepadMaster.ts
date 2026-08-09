@@ -1,7 +1,7 @@
 import { EventEmitter } from "eventemitter3";
 
 //import * as gamepad_standardizer from "gamepad_standardizer"
-import { Dpad, DP_BUTTON_NAME, getDpadDirection, XY } from "gamepad_standardizer";
+import { Dpad, DP_BUTTON_NAME, getDpadDirection, DirectionWrap, XY } from "gamepad_standardizer";
 import {
 	ButtonState,
 	mappingGroup,
@@ -23,6 +23,15 @@ import { getPairFromBtnName, getPairFromUiBtnName } from "./uiPairing";
 import { isWindowActive } from "../utils/windowActive";
 
 const unchangeable = ["start", ...DP_BUTTON_NAME];
+
+/**
+ * A stick reading as a {@link systemInput.ui_scroll} amount — `undefined` while it rests inside
+ * its deadzone, so "nobody is scrolling" is one check rather than two comparisons with zero.
+ */
+function toScroll(d: DirectionWrap | null | undefined): XY | undefined {
+	if (!d || (d.x === 0 && d.y === 0)) return undefined;
+	return { x: d.x, y: d.y };
+}
 
 enum Operation {
 	Plus = "+",
@@ -263,6 +272,11 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 			}
 			doublePressDirection = doublePressDirection || inputResult.directionButton[btnName].double;
 		}
+		// The right stick is where "scroll the view" comes from on a pad — a UI action, so it goes
+		// on the UI side of the input as `ui_scroll` and survives a UI-only flush, unlike every
+		// other analog reading. See `systemInput.ui_scroll`.
+		const ui_scroll = toScroll(inputResult.direction?.rightAnalog);
+
 		if (uiOnly)
 			return {
 				source: ControlType.GAMEPAD,
@@ -270,6 +284,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 				ui_tap,
 				ui_pressing,
 				ui_repeat,
+				ui_scroll,
 			};
 
 		const mixedDpad: any = getDpadDirection({
@@ -325,6 +340,7 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 			ui_tap,
 			ui_pressing,
 			ui_repeat,
+			ui_scroll,
 
 			mixedDpad,
 			doublePressDirection,
@@ -608,7 +624,9 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 	}
 
 	public setDefaultMapping(mapping: mappingGroup): void {
-		this.defaultStandardMapping = mapping;
+		// See KeyboardMaster.setDefaultKeyboardMapping — the default is a copy, so that a rebind
+		// (which writes into `currentMapping`) can never reach the thing `resetDefault` restores.
+		this.defaultStandardMapping = clone(mapping);
 	}
 
 	public checkMapping(index: number, buttonName: string, keyCode: string): boolean {

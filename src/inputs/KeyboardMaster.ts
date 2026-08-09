@@ -552,7 +552,10 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
             }
         }
         */
-		this.defaultMapping[id] = mapping;
+		// Cloned: the caller's table is usually a module-level constant it goes on using (and often
+		// hands to ProfileMapping as a factory profile as well), and the whole job of this copy is
+		// to still say what the factory keys were after the player has rebound half of them.
+		this.defaultMapping[id] = clone(mapping);
 		if (!this.currentMapping[id]) {
 			this.setAllMapping(id, mapping);
 		}

@@ -28,6 +28,15 @@ export {
 export * from "./types";
 
 export { buttonLayout, ControllerId, GAMEPAD_INDEX_OFFSET, VIRTUAL_INDEX_OFFSET } from "./config";
+// The fixed keyboard menu keys. Exported because a UI that *names* a key needs to be able to
+// ask which one — they are not in any player mapping, so `renewSystemButtonLayout` cannot
+// answer for them (see ControlWrap.preserveNavKeys).
+export {
+	KEYBOARD_HARDCODE_UI_BUTTON,
+	KEYBOARD_HARDCODE_UI_BUTTON_NON_STRUCT,
+	KEYBOARD_HARDCODE_UI_BUTTON_STRUCT,
+} from "./config";
+export { getPairFromBtnName, getPairFromUiBtnName } from "./inputs/uiPairing";
 
 export * from "./useful/InputHelper";
 export * from "./useful/fighterHelper";

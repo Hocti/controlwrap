@@ -204,6 +204,18 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 	}
 
 	/**
+	 * Whether the fixed nav keys are reserved — see {@link setPreserveNavKeys}.
+	 *
+	 * Readable because it is not only an input-routing switch: it is the answer to "which key
+	 * should a menu *tell* the player to press". With it on, Enter and the arrows are the
+	 * navigation keys for everyone whatever they have mapped; with it off, each seat navigates
+	 * with its own keys and those are the ones worth naming.
+	 */
+	public get preserveNavKeys(): boolean {
+		return (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).preserveNavKeys;
+	}
+
+	/**
 	 * Ignore gamepad input while the window does not have focus (default true).
 	 *
 	 * A keyboard already behaves this way — an unfocused window receives no key events — but a
@@ -259,6 +271,24 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 		mapping: KEYBOARD_HARDCODE_UI_BUTTON,
 	};
 	private lastButtonLayout: latestLayoutGroup = this.defaultButtonLayout;
+
+	/**
+	 * The controller that most recently pressed something, or -1 before anything has been
+	 * pressed. Unlike {@link mainControllerIndex} this is never claimed and never cleared — it is
+	 * simply "who is driving right now", which is what a hint bar needs in order to name one
+	 * device instead of listing every possible one.
+	 *
+	 * There is also a `changeLastInputIndex` event, but it fires only on a *change*: a listener
+	 * that subscribes late would never learn the current value, so it cannot be the only way in.
+	 */
+	public get lastInputIndex(): number {
+		return this._lastInputIndex;
+	}
+
+	/** The layout + live mapping of {@link lastInputIndex}, recomputed whenever it changes. */
+	public get lastLayout(): latestLayoutGroup {
+		return this.lastButtonLayout;
+	}
 
 	private _lastUpdateTime: number = -1;
 
@@ -372,6 +402,13 @@ export default class ControlWrap extends EventEmitter implements IControllerMast
 			return (ControlWrap.masterRecord[ControlType.GAMEPAD] as GamepadMaster).renewSystemButtonLayout(cIndex);
 		} else if (cType == ControlType.KEYBOARD) {
 			return (ControlWrap.masterRecord[ControlType.KEYBOARD] as KeyboardMaster).renewSystemButtonLayout(cIndex);
+		} else if (cType == ControlType.VIRTUAL) {
+			// The virtual master has always implemented this; nothing called it, so a touch player
+			// fell through to `defaultButtonLayout` — the *keyboard* table — and every %token% in
+			// their hints and help text came back as a key cap.
+			return (ControlWrap.masterRecord[ControlType.VIRTUAL] as VirtualGamepadMaster).renewSystemButtonLayout(
+				cIndex
+			);
 		}
 		return this.defaultButtonLayout;
 	}

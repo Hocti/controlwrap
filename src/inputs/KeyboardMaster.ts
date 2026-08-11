@@ -16,6 +16,8 @@ import {
 	SYSTEM_INDEX_OFFSET,
 	KEYBOARD_HARDCODE_UI_BUTTON,
 	KEYBOARD_HARDCODE_UI_BUTTON_STRUCT,
+	KEYBOARD_HARDCODE_UI_ALIAS,
+	hardcodedUIKeys,
 	buttonLayout,
 } from "../config";
 
@@ -374,7 +376,16 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 				? KEYBOARD_HARDCODE_UI_BUTTON
 				: KEYBOARD_HARDCODE_UI_BUTTON_STRUCT;
 		for (let keyName in navKeys) {
-			sdf[keyName] = keyStatus[navKeys[keyName]];
+			// An action may be reachable by more than one physical key (KEYBOARD_HARDCODE_UI_ALIAS).
+			// Merged here rather than reported separately: everything downstream reads action names,
+			// and two keys meaning one action must look like one key that was pressed twice as often.
+			let state = keyStatus[navKeys[keyName]];
+			for (const alias of KEYBOARD_HARDCODE_UI_ALIAS[keyName] ?? []) {
+				const other = keyStatus[alias];
+				if (!other) continue;
+				state = state ? joinState(state, other) : other;
+			}
+			sdf[keyName] = state;
 		}
 		const ui_tap: string[] = [];
 		const ui_pressing: string[] = [];
@@ -566,9 +577,11 @@ export default class KeyboardMaster extends InputDeviceMaster implements IContro
 		if (buttonName === "escape") return false;
 
 		// Reserved system keys can't be remapped (except keyboard 0 keeping its own default).
-		// Escape (STRUCT) is always reserved; arrows/Enter are reserved only while preserved.
+		// Escape and info (STRUCT) are always reserved; arrows/Enter only while preserved.
+		// Aliases are reserved with their primary — a key that raises `info` is not free just
+		// because it is the second way to say it.
 		const reserved = this.preserveNavKeys ? KEYBOARD_HARDCODE_UI_BUTTON : KEYBOARD_HARDCODE_UI_BUTTON_STRUCT;
-		if (Object.values(reserved).includes(keyCode) && (reserved[buttonName] !== keyCode || id != 0)) {
+		if (hardcodedUIKeys(reserved).includes(keyCode) && (reserved[buttonName] !== keyCode || id != 0)) {
 			return false;
 		}
 

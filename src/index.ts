@@ -35,6 +35,8 @@ export {
 	KEYBOARD_HARDCODE_UI_BUTTON,
 	KEYBOARD_HARDCODE_UI_BUTTON_NON_STRUCT,
 	KEYBOARD_HARDCODE_UI_BUTTON_STRUCT,
+	KEYBOARD_HARDCODE_UI_ALIAS,
+	hardcodedUIKeys,
 } from "./config";
 export { getPairFromBtnName, getPairFromUiBtnName } from "./inputs/uiPairing";
 

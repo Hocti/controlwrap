@@ -153,7 +153,9 @@ Optional (list them in `requirement.ui_optional`): `cancel`, `info`, `prevTab`, 
 
 **Keyboard UI rules** — this is the tricky part:
 
-- Enter → `confirm`, Esc → `escape`, Arrows → `up/down/left/right`. These are **hardcoded on the system keyboard** (`index 1000`) and always work, even with no player mapped.
+- Enter → `confirm`, Esc → `escape`, Arrows → `up/down/left/right`, CapsLock (and `` ` ``) → `info`. These are **hardcoded on the system keyboard** (`index 1000`) and always work, even with no player mapped.
+- **Esc and `info` are STRUCT**: live in both UI modes and unbindable by any seat. Everything else in that table is NON_STRUCT — switched off in `UIInputMode.multi` unless `preserveNavKeys` is on. Put a key in STRUCT only if a *running match* needs it.
+- `info` has two keys (`KEYBOARD_HARDCODE_UI_ALIAS`). CapsLock is the primary and the one the hint bar draws; `` ` `` exists because macOS reports a lock key by its lit state, so **CapsLock cannot be held** there and `pressFrame` never climbs. Read a *tap* of `info` and both work everywhere; read a *hold* and only the alias will do.
 - All keyboard players **share the same Esc** as escape / pause. You cannot give each keyboard player their own Esc.
 - For multi-player on one keyboard, give each player their own `confirm` and `cancel` via `ui_pair` (e.g. `confirm: "attack"`, `cancel: "jump"`). The player's game button then also fires the matching UI role.
 - For a single-player "global system UI" (main menu of a single-player game): you do NOT need a `cancel` — Enter is confirm, Esc is cancel. `cancel` in `ui_pair` is only useful for per-player menus in multiplayer.

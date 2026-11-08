@@ -198,10 +198,13 @@ export default class GamepadMaster extends InputDeviceMaster implements IControl
 		// Read once per flush, not per pad: every pad must agree on whether this frame counts.
 		const suppressed = this.suppressed;
 		for (let i = 0, t = gps.length; i < t; i++) {
-			if (this.gamePads[i] === undefined) {
+			// `getGamepads()` can already answer null for a slot whose `gamepaddisconnected` has not
+			// been dispatched yet; reading it would throw inside the frame loop.
+			const gp = gps[i];
+			if (this.gamePads[i] === undefined || !gp) {
 				continue;
 			}
-			const inputResult = this.gamePads[i]!.flush(gps[i]!, uiOnly, suppressed);
+			const inputResult = this.gamePads[i]!.flush(gp, uiOnly, suppressed);
 			// A rebind must not be answered by a window the player is not looking at — the press
 			// that assigns a button belongs to whoever has focus.
 			if (suppressed) {
